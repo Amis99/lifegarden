@@ -581,7 +581,7 @@ const JOBS = [
   { id: "job_40", name: "벤처 대표", salary: 500, effects: { growth: 0.4, happiness: -0.4, health: -0.4 } }
 ];
 
-const JOB_REQUIREMENT_MIN = 25000;
+const JOB_REQUIREMENT_LEVEL = 2;
 const JOB_REQUIREMENTS = {
   growth: new Set(["job_22", "job_29", "job_30", "job_31", "job_34", "job_36", "job_37"]),
   reputation: new Set(["job_16", "job_17", "job_25", "job_26", "job_32", "job_33", "job_35", "job_38", "job_39", "job_40"]),
@@ -590,11 +590,11 @@ const JOB_REQUIREMENTS = {
 
 JOBS.forEach((job) => {
   if (JOB_REQUIREMENTS.growth.has(job.id)) {
-    job.requirement = { key: "growth", min: JOB_REQUIREMENT_MIN, label: RESOURCE_LABELS.growth };
+    job.requirement = { key: "growth", minLevel: JOB_REQUIREMENT_LEVEL, label: RESOURCE_LABELS.growth };
   } else if (JOB_REQUIREMENTS.reputation.has(job.id)) {
-    job.requirement = { key: "reputation", min: JOB_REQUIREMENT_MIN, label: RESOURCE_LABELS.reputation };
+    job.requirement = { key: "reputation", minLevel: JOB_REQUIREMENT_LEVEL, label: RESOURCE_LABELS.reputation };
   } else if (JOB_REQUIREMENTS.health.has(job.id)) {
-    job.requirement = { key: "health", min: JOB_REQUIREMENT_MIN, label: RESOURCE_LABELS.health };
+    job.requirement = { key: "health", minLevel: JOB_REQUIREMENT_LEVEL, label: RESOURCE_LABELS.health };
   }
 });
 
@@ -3133,13 +3133,19 @@ function isJobEligible(player, job) {
   const requirement = getJobRequirement(job);
   if (!requirement) return true;
   const current = player?.[requirement.key] ?? 0;
-  return current >= requirement.min;
+  if (Number.isFinite(requirement.minLevel)) {
+    return getStatLevel(current) >= requirement.minLevel;
+  }
+  return current >= (requirement.min ?? 0);
 }
 
 function formatJobRequirement(job) {
   const requirement = getJobRequirement(job);
   if (!requirement) return "";
   const label = requirement.label || RESOURCE_LABELS[requirement.key] || requirement.key;
+  if (Number.isFinite(requirement.minLevel)) {
+    return `조건: ${label} Lv.${requirement.minLevel} 이상`;
+  }
   return `조건: ${label} ${formatNumber(requirement.min)} 이상`;
 }
 
