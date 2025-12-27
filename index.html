@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>인생정원</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="title-block">
+          <p class="kicker">가족 4인용 디지털 보드게임</p>
+          <h1>인생정원</h1>
+          <p class="subtitle">선택이 쌓여 나만의 이야기가 되는 따뜻한 도시 보드게임</p>
+        </div>
+        <div class="meta-block">
+          <div class="meta-pill" id="progress-display">완주 0/4</div>
+          <div class="meta-pill" id="turn-display">턴 1</div>
+          <div class="project-card project-card-header">
+            <div class="project-title">도시 프로젝트 · 협력 목표</div>
+            <div class="project-bar">
+              <div class="project-fill" id="project-fill"></div>
+            </div>
+            <div class="project-desc" id="project-desc">협력 보너스를 모으는 중</div>
+          </div>
+          <button id="save-btn" class="primary-btn small save-btn">저장하기</button>
+        </div>
+      </header>
+
+      <section class="status-row">
+        <div class="players compact" id="player-panels"></div>
+      </section>
+
+      <main class="main-grid">
+        <section class="board-section">
+          <div class="board-wrap">
+            <div class="board-frame">
+              <div id="board" class="board"></div>
+            </div>
+            <div class="effect-layer" id="effect-layer"></div>
+            <div class="board-center">
+              <div class="dice-card" id="dice-card">
+                <div class="dice-title">이번 이동</div>
+                <div class="dice-player" id="dice-player"></div>
+                <div class="roulette" aria-hidden="true">
+                  <div class="roulette-wheel" id="roulette-wheel"></div>
+                  <div class="roulette-pointer"></div>
+                  <div class="dice-value" id="dice-value">-</div>
+                </div>
+                <button id="roll-btn" class="primary-btn">룰렛 돌리기</button>
+                <div class="phase-hint" id="phase-hint">준비 중...</div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <aside class="log-panel log-panel-right">
+          <div class="log-title">이야기 로그</div>
+          <ul id="log-list"></ul>
+        </aside>
+      </main>
+    </div>
+
+    
+    <div class="modal show" id="start-modal" aria-hidden="false">
+      <div class="modal-card start-card">
+        <h2>게임 시작</h2>
+        <p class="modal-subtitle">새로운 인생을 시작하거나 이어서 플레이하세요.</p>
+        <div class="start-actions">
+          <button id="new-game-btn" class="primary-btn wide">새로 하기</button>
+          <button id="continue-game-btn" class="primary-btn wide outline">이어하기</button>
+        </div>
+        <div class="start-note" id="continue-note"></div>
+      </div>
+    </div>
+
+    <div class="modal" id="setup-modal" aria-hidden="true">
+      <div class="modal-card setup-card">
+        <h2>게임 시작 설정</h2>
+        <p class="modal-subtitle">플레이어 이름과 캐릭터를 골라 주세요.</p>
+
+        <div class="setup-grid">
+          <div class="setup-player">
+            <label for="player-1-name">플레이어 1</label>
+            <input id="player-1-name" type="text" value="플레이어 1" />
+            <label for="player-1-type">유형</label>
+            <select id="player-1-type">
+              <option value="player" selected>플레이어</option>
+              <option value="cpu">CPU</option>
+              <option value="none">참여 안함</option>
+            </select>
+            <label for="player-1-character">캐릭터</label>
+            <select id="player-1-character"></select>
+            <div class="char-desc" id="player-1-desc"></div>
+          </div>
+          <div class="setup-player">
+            <label for="player-2-name">플레이어 2</label>
+            <input id="player-2-name" type="text" value="플레이어 2" />
+            <label for="player-2-type">유형</label>
+            <select id="player-2-type">
+              <option value="player" selected>플레이어</option>
+              <option value="cpu">CPU</option>
+              <option value="none">참여 안함</option>
+            </select>
+            <label for="player-2-character">캐릭터</label>
+            <select id="player-2-character"></select>
+            <div class="char-desc" id="player-2-desc"></div>
+          </div>
+          <div class="setup-player">
+            <label for="player-3-name">플레이어 3</label>
+            <input id="player-3-name" type="text" value="플레이어 3" />
+            <label for="player-3-type">유형</label>
+            <select id="player-3-type">
+              <option value="player" selected>플레이어</option>
+              <option value="cpu">CPU</option>
+              <option value="none">참여 안함</option>
+            </select>
+            <label for="player-3-character">캐릭터</label>
+            <select id="player-3-character"></select>
+            <div class="char-desc" id="player-3-desc"></div>
+          </div>
+          <div class="setup-player">
+            <label for="player-4-name">플레이어 4</label>
+            <input id="player-4-name" type="text" value="플레이어 4" />
+            <label for="player-4-type">유형</label>
+            <select id="player-4-type">
+              <option value="player" selected>플레이어</option>
+              <option value="cpu">CPU</option>
+              <option value="none">참여 안함</option>
+            </select>
+            <label for="player-4-character">캐릭터</label>
+            <select id="player-4-character"></select>
+            <div class="char-desc" id="player-4-desc"></div>
+          </div>
+        </div>
+
+        <button id="start-btn" class="primary-btn wide">게임 시작</button>
+      </div>
+    </div>
+
+    <div class="modal" id="event-modal" aria-hidden="true">
+      <div class="modal-card event-card">
+        <div class="event-header">
+          <h2 id="event-title">이벤트</h2>
+          <span class="event-category" id="event-category"></span>
+        </div>
+        <p class="event-description" id="event-description"></p>
+        <div class="event-choices" id="event-choices"></div>
+        <div class="event-result hidden" id="event-result">
+          <div class="result-story" id="event-story"></div>
+          <div class="result-effects" id="event-effects"></div>
+        </div>
+        <button id="event-continue" class="primary-btn hidden">다음</button>
+      </div>
+    </div>
+
+    <div class="modal" id="action-modal" aria-hidden="true">
+      <div class="modal-card action-card">
+        <section class="action-panel" id="action-panel">
+          <div class="action-head">
+            <h3>선택 액션</h3>
+          </div>
+          <div class="action-buttons" id="action-buttons"></div>
+          <div class="action-helper hidden" id="action-helper">
+            <label for="help-target">도움 받을 플레이어</label>
+            <div class="action-helper-row">
+              <select id="help-target"></select>
+              <button id="help-confirm" class="primary-btn small">확정</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="modal" id="marriage-modal" aria-hidden="true">
+      <div class="modal-card marriage-card">
+        <div class="marriage-header">
+          <h2>결혼</h2>
+          <p class="modal-subtitle">함께할 동반자를 고르거나 혼자 걷기를 선택하세요.</p>
+        </div>
+        <div class="marriage-filters" id="marriage-filters">
+          <button type="button" class="filter-btn active" data-gender="all">전체</button>
+          <button type="button" class="filter-btn" data-gender="female">여성</button>
+          <button type="button" class="filter-btn" data-gender="male">남성</button>
+        </div>
+        <div class="marriage-list" id="marriage-list"></div>
+        <div class="marriage-footer">
+          <button type="button" class="primary-btn small" id="marriage-prev">이전</button>
+          <div class="marriage-page" id="marriage-page">1 / 1</div>
+          <button type="button" class="primary-btn small" id="marriage-next">다음</button>
+          <button type="button" class="primary-btn small outline" id="marriage-skip">결혼 안 함</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="job-modal" aria-hidden="true">
+      <div class="modal-card job-card">
+        <div class="job-header">
+          <h2>직업 선택</h2>
+          <p class="modal-subtitle">월급과 성향을 고려해 직업을 골라주세요.</p>
+        </div>
+        <div class="job-list" id="job-list"></div>
+        <div class="job-footer">
+          <button type="button" class="primary-btn small" id="job-prev">이전</button>
+          <div class="job-page" id="job-page">1 / 1</div>
+          <button type="button" class="primary-btn small" id="job-next">다음</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="result-modal" aria-hidden="true">
+      <div class="modal-card result-card">
+        <h2 id="result-title">결과</h2>
+        <p class="result-story" id="result-story"></p>
+        <div class="result-effects" id="result-effects"></div>
+        <button id="result-continue" class="primary-btn">확인</button>
+      </div>
+    </div>
+
+    <div class="modal" id="end-modal" aria-hidden="true">
+      <div class="modal-card end-card">
+        <h2>정원시 축제 결과</h2>
+        <p class="modal-subtitle">한 해 동안의 선택이 이렇게 쌓였어요.</p>
+        <div class="end-content">
+          <div>
+            <div class="end-section-title">종합 순위</div>
+            <ol id="final-ranking"></ol>
+          </div>
+          <div>
+            <div class="end-section-title">개인 칭호</div>
+            <ul id="final-titles"></ul>
+          </div>
+        </div>
+        <div class="end-section-title">인생평</div>
+        <div class="final-reviews" id="final-reviews"></div>
+        <button id="restart-btn" class="primary-btn wide">다시 시작</button>
+      </div>
+    </div>
+
+    <div class="modal" id="trade-modal" aria-hidden="true">
+      <div class="modal-card trade-card">
+        <div class="trade-header">
+          <h2>투자/매매</h2>
+          <p class="modal-subtitle" id="trade-subtitle">현재 시세를 확인하고 거래하세요.</p>
+        </div>
+        <div class="trade-tabs" id="trade-tabs">
+          <button type="button" class="trade-tab" data-category="all">전체</button>
+          <button type="button" class="trade-tab" data-category="bond">채권</button>
+          <button type="button" class="trade-tab" data-category="stock">주식</button>
+          <button type="button" class="trade-tab" data-category="estate">부동산</button>
+        </div>
+        <div class="trade-market" id="trade-market"></div>
+        <div class="trade-footer">
+          <div class="trade-summary" id="trade-summary"></div>
+          <button id="trade-close" class="primary-btn wide">거래 완료</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="trade-offer-modal" aria-hidden="true">
+      <div class="modal-card trade-offer-card">
+        <h2>자산 매도 제안</h2>
+        <p class="modal-subtitle" id="trade-offer-text"></p>
+        <div class="trade-offer-actions">
+          <button id="trade-offer-decline" class="primary-btn">거절</button>
+          <button id="trade-offer-accept" class="primary-btn">수락</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="auction-modal" aria-hidden="true">
+      <div class="modal-card auction-card">
+        <h2>강제 경매</h2>
+        <p class="modal-subtitle" id="auction-subtitle"></p>
+        <div class="auction-list" id="auction-list"></div>
+      </div>
+    </div>
+
+    <div class="modal" id="asset-modal" aria-hidden="true">
+      <div class="modal-card asset-card">
+        <div class="asset-modal-header">
+          <h2 id="asset-title">보유 자산</h2>
+          <button id="asset-close" class="primary-btn small">닫기</button>
+        </div>
+        <div class="asset-modal-list" id="asset-list"></div>
+      </div>
+    </div>
+
+    <div class="modal" id="marriage-info-modal" aria-hidden="true">
+      <div class="modal-card info-card">
+        <h2>결혼 정보</h2>
+        <p class="modal-subtitle" id="marriage-info-title"></p>
+        <div class="info-body" id="marriage-info-body"></div>
+        <button id="marriage-info-close" class="primary-btn wide">닫기</button>
+      </div>
+    </div>
+
+    <div class="modal" id="job-info-modal" aria-hidden="true">
+      <div class="modal-card info-card">
+        <h2>직업 정보</h2>
+        <p class="modal-subtitle" id="job-info-title"></p>
+        <div class="info-body" id="job-info-body"></div>
+        <button id="job-info-close" class="primary-btn wide">닫기</button>
+      </div>
+    </div>
+
+    <script src="events.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>
