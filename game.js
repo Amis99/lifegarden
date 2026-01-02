@@ -4695,8 +4695,8 @@ function getSpouseById(spouseId) {
 }
 
 function buildSpouseEffects(traits) {
-  const perTurn = {};
-  const penalties = {};
+  let perTurn = {};
+  let penalties = {};
   const timed = [];
   const traitLabels = [];
   const penaltyLabels = [];
@@ -4705,10 +4705,10 @@ function buildSpouseEffects(traits) {
     if (!trait) return;
     traitLabels.push(trait.label);
     if (trait.perTurn) {
-      mergeEffectObjects(perTurn, trait.perTurn);
+      perTurn = mergeEffectObjects(perTurn, trait.perTurn);
     }
     if (trait.penalty) {
-      mergeEffectObjects(penalties, trait.penalty);
+      penalties = mergeEffectObjects(penalties, trait.penalty);
     }
     if (trait.penaltyLabel) {
       penaltyLabels.push(trait.penaltyLabel);
