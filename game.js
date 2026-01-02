@@ -1153,6 +1153,7 @@ function openStartModal() {
 
 function closeStartModal() {
   if (!elements.startModal) return;
+  clearModalFocus(elements.startModal);
   elements.startModal.classList.remove("show");
   elements.startModal.setAttribute("aria-hidden", "true");
 }
@@ -1165,6 +1166,7 @@ function openSetupModal() {
 
 function closeSetupModal() {
   if (!elements.setupModal) return;
+  clearModalFocus(elements.setupModal);
   elements.setupModal.classList.remove("show");
   elements.setupModal.setAttribute("aria-hidden", "true");
 }
@@ -1172,6 +1174,14 @@ function closeSetupModal() {
 function setContinueNote(text) {
   if (!elements.continueNote) return;
   elements.continueNote.textContent = text || "";
+}
+
+function clearModalFocus(modal) {
+  if (!modal) return;
+  const active = document.activeElement;
+  if (active && modal.contains(active)) {
+    active.blur();
+  }
 }
 
 function updateContinueAvailability() {
@@ -2799,6 +2809,7 @@ function openAuctionModal(player, amount, position, onComplete) {
 
 function closeAuctionModal() {
   if (!elements.auctionModal) return;
+  clearModalFocus(elements.auctionModal);
   elements.auctionModal.classList.remove("show");
   elements.auctionModal.setAttribute("aria-hidden", "true");
 }
@@ -3640,6 +3651,7 @@ function showResultModal({ title, story, sections, autoClose, variant } = {}) {
   }
   elements.resultModal.classList.add("show");
   elements.resultModal.setAttribute("aria-hidden", "false");
+  clearModalFocus(elements.actionModal);
   elements.actionModal.classList.remove("show");
   elements.actionModal.setAttribute("aria-hidden", "true");
   if (autoClose) {
@@ -3671,6 +3683,14 @@ function handleResultContinue() {
     const next = pendingResultAction;
     pendingResultAction = null;
     next();
+    return;
+  }
+  if (state.phase === "action" && !isCpuPlayer(currentPlayer())) {
+    if (elements.actionModal && !elements.actionModal.classList.contains("show")) {
+      elements.actionModal.classList.add("show");
+      elements.actionModal.setAttribute("aria-hidden", "false");
+      syncActionCardSizes();
+    }
   }
 }
 
@@ -4826,6 +4846,7 @@ function updateMarketPrices() {
 }
 
 function openTradeModal() {
+  clearModalFocus(elements.actionModal);
   elements.actionModal.classList.remove("show");
   elements.actionModal.setAttribute("aria-hidden", "true");
   state.tradeCategory = "all";
@@ -4835,9 +4856,11 @@ function openTradeModal() {
 }
 
 function closeTradeModal() {
+  clearModalFocus(elements.tradeModal);
   elements.tradeModal.classList.remove("show");
   elements.tradeModal.setAttribute("aria-hidden", "true");
   if (elements.auctionModal) {
+    clearModalFocus(elements.auctionModal);
     elements.auctionModal.classList.remove("show");
     elements.auctionModal.setAttribute("aria-hidden", "true");
   }
@@ -4873,6 +4896,7 @@ function openAssetModal(player) {
 }
 
 function closeAssetModal() {
+  clearModalFocus(elements.assetModal);
   elements.assetModal.classList.remove("show");
   elements.assetModal.setAttribute("aria-hidden", "true");
 }
@@ -4886,6 +4910,7 @@ function openMarriageInfoModal(player) {
 
 function closeMarriageInfoModal() {
   if (!elements.marriageInfoModal) return;
+  clearModalFocus(elements.marriageInfoModal);
   elements.marriageInfoModal.classList.remove("show");
   elements.marriageInfoModal.setAttribute("aria-hidden", "true");
 }
@@ -4899,6 +4924,7 @@ function openJobInfoModal(player) {
 
 function closeJobInfoModal() {
   if (!elements.jobInfoModal) return;
+  clearModalFocus(elements.jobInfoModal);
   elements.jobInfoModal.classList.remove("show");
   elements.jobInfoModal.setAttribute("aria-hidden", "true");
 }
