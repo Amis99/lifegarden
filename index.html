@@ -196,14 +196,32 @@
     <div class="modal" id="job-modal" aria-hidden="true">
       <div class="modal-card job-card">
         <div class="job-header">
-          <h2>직업 선택</h2>
-          <p class="modal-subtitle">월급과 성향을 고려해 직업을 골라주세요.</p>
+          <h2 id="job-title">직업 선택</h2>
+          <p class="modal-subtitle" id="job-subtitle">월급과 성향을 고려해 직업을 골라주세요.</p>
         </div>
         <div class="job-list" id="job-list"></div>
         <div class="job-footer">
           <button type="button" class="primary-btn small" id="job-prev">이전</button>
           <div class="job-page" id="job-page">1 / 1</div>
           <button type="button" class="primary-btn small" id="job-next">다음</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="career-modal" aria-hidden="true">
+      <div class="modal-card career-card">
+        <div class="career-header">
+          <h2 id="career-title">승진 및 이직</h2>
+          <p class="modal-subtitle" id="career-subtitle">조건을 만족하면 승진하거나 이직을 선택할 수 있습니다.</p>
+        </div>
+        <div class="career-body">
+          <div class="career-current" id="career-current"></div>
+          <div class="career-requirements" id="career-requirements"></div>
+        </div>
+        <div class="career-actions">
+          <button type="button" class="primary-btn" id="career-promote">승진</button>
+          <button type="button" class="primary-btn" id="career-transfer">이직</button>
+          <button type="button" class="primary-btn outline" id="career-stay">유지</button>
         </div>
       </div>
     </div>

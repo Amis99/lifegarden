@@ -25,7 +25,8 @@ const TILE_IMAGES = {
   back: `${IMAGE_ROOT}/tile_back.png`,
   rest: `${IMAGE_ROOT}/tile_rest.png`,
   marriage: `${IMAGE_ROOT}/tile_marriage.png`,
-  job: `${IMAGE_ROOT}/tile_job.jpg`
+  job: `${IMAGE_ROOT}/tile_job.jpg`,
+  career: `${IMAGE_ROOT}/tile_job.jpg`
 };
 const ACTION_CARD_IMAGES = {
   front: `${IMAGE_ROOT}/card_action_front.png`,
@@ -201,7 +202,8 @@ const SPACE_LABELS = {
   back: "되돌림",
   rest: "휴식",
   marriage: "결혼",
-  job: "직업"
+  job: "직업",
+  career: "승진/이직"
 };
 
 const BOARD_ROWS = 10;
@@ -229,9 +231,20 @@ const BOARD_PATTERN = [
   "daily"
 ];
 
+const CAREER_SPACE_NUMBERS = [100, 160];
+const CAREER_FIRE_LEVEL = 2;
+const CAREER_PROMOTION_LEVEL = 4;
+const CAREER_PROMOTION_LEVEL_HIGH = 5;
+const CAREER_TRANSFER_LEVEL = 5;
+const CAREER_TRANSFER_LEVEL_HIGH = 6;
+const CAREER_PROMOTION_MULTIPLIER = 1.5;
+const CAREER_TRANSFER_MULTIPLIER = 2;
+const CAREER_HIGH_SALARY = 400;
+
 const SPECIAL_SPACES = buildSpecialSpaces(BOARD_ROWS * BOARD_COLS);
 const MARRIAGE_INDEX = SPECIAL_SPACES.marriageIndex;
 const JOB_INDEX = SPECIAL_SPACES.jobIndex;
+const CAREER_INDICES = SPECIAL_SPACES.careerIndices || [];
 const BACK_SPACES = SPECIAL_SPACES.backSpaces;
 const REST_SPACES = SPECIAL_SPACES.restSpaces;
 
@@ -587,7 +600,6 @@ const JOB_REQUIREMENTS = {
   reputation: new Set(["job_16", "job_17", "job_25", "job_26", "job_32", "job_33", "job_35", "job_38", "job_39", "job_40"]),
   health: new Set(["job_08", "job_09", "job_12", "job_18"])
 };
-
 JOBS.forEach((job) => {
   if (JOB_REQUIREMENTS.growth.has(job.id)) {
     job.requirement = { key: "growth", minLevel: JOB_REQUIREMENT_LEVEL, label: RESOURCE_LABELS.growth };
@@ -596,6 +608,7 @@ JOBS.forEach((job) => {
   } else if (JOB_REQUIREMENTS.health.has(job.id)) {
     job.requirement = { key: "health", minLevel: JOB_REQUIREMENT_LEVEL, label: RESOURCE_LABELS.health };
   }
+  job.careerKey = deriveCareerKey(job);
 });
 
 const DEFAULT_ENDING = {
@@ -992,7 +1005,8 @@ const state = {
   tradeCategory: "all",
   marriageFilter: "all",
   marriagePage: 0,
-  jobPage: 0
+  jobPage: 0,
+  jobSelectionMode: "initial"
 };
 
 const elements = {
@@ -1050,10 +1064,20 @@ const elements = {
   marriageNext: document.getElementById("marriage-next"),
   marriageSkip: document.getElementById("marriage-skip"),
   jobModal: document.getElementById("job-modal"),
+  jobTitle: document.getElementById("job-title"),
+  jobSubtitle: document.getElementById("job-subtitle"),
   jobList: document.getElementById("job-list"),
   jobPage: document.getElementById("job-page"),
   jobPrev: document.getElementById("job-prev"),
   jobNext: document.getElementById("job-next"),
+  careerModal: document.getElementById("career-modal"),
+  careerTitle: document.getElementById("career-title"),
+  careerSubtitle: document.getElementById("career-subtitle"),
+  careerCurrent: document.getElementById("career-current"),
+  careerRequirements: document.getElementById("career-requirements"),
+  careerPromote: document.getElementById("career-promote"),
+  careerTransfer: document.getElementById("career-transfer"),
+  careerStay: document.getElementById("career-stay"),
   startModal: document.getElementById("start-modal"),
   newGameBtn: document.getElementById("new-game-btn"),
   continueGameBtn: document.getElementById("continue-game-btn"),
@@ -1305,6 +1329,7 @@ function buildSavePayload() {
       marriageFilter: state.marriageFilter,
       marriagePage: state.marriagePage,
       jobPage: state.jobPage,
+      jobSelectionMode: state.jobSelectionMode,
       pendingTradeOffer: state.pendingTradeOffer
     },
     players: state.players.map((player) => serializePlayer(player))
@@ -1450,6 +1475,7 @@ function applySavedState(payload) {
   state.marriageFilter = saved.marriageFilter || "all";
   state.marriagePage = Number.isFinite(saved.marriagePage) ? saved.marriagePage : 0;
   state.jobPage = Number.isFinite(saved.jobPage) ? saved.jobPage : 0;
+  state.jobSelectionMode = saved.jobSelectionMode || "initial";
   state.pendingTradeOffer = saved.pendingTradeOffer || null;
   state.currentEvent = resolveSavedEvent(saved.currentEventId);
   state.isRolling = false;
@@ -1550,6 +1576,15 @@ function bindEvents() {
   }
   if (elements.jobList) {
     elements.jobList.addEventListener("click", handleJobSelect);
+  }
+  if (elements.careerPromote) {
+    elements.careerPromote.addEventListener("click", handleCareerPromote);
+  }
+  if (elements.careerTransfer) {
+    elements.careerTransfer.addEventListener("click", handleCareerTransfer);
+  }
+  if (elements.careerStay) {
+    elements.careerStay.addEventListener("click", handleCareerStay);
   }
   window.addEventListener("resize", positionSpaces);
 }
@@ -1700,6 +1735,7 @@ function startGame() {
   state.marriageFilter = "all";
   state.marriagePage = 0;
   state.jobPage = 0;
+  state.jobSelectionMode = "initial";
   state.isRolling = false;
   closeStartModal();
   elements.setupModal.classList.remove("show");
@@ -1772,6 +1808,7 @@ function resetGame(showStart = true) {
   state.marriageFilter = "all";
   state.marriagePage = 0;
   state.jobPage = 0;
+  state.jobSelectionMode = "initial";
   setPhase("setup");
   updateUI();
   updateSaveButton();
@@ -1843,15 +1880,22 @@ function createBoardPath(rows, cols) {
 function buildSpecialSpaces(total) {
   const marriageIndex = Math.floor((total - 1) / 3);
   const jobIndex = Math.min(total - 2, Math.max(1, 39));
+  const careerIndices = CAREER_SPACE_NUMBERS.map((number) => number - 1).filter((index) => {
+    if (index <= 0 || index >= total - 1) return false;
+    if (index === marriageIndex || index === jobIndex) return false;
+    return true;
+  });
   const backRatios = [0.12, 0.2, 0.42, 0.55, 0.68, 0.8, 0.9];
   const restRatios = [0.26, 0.6];
   const backSpaces = new Map();
   const restSpaces = new Set();
+  const careerSet = new Set(careerIndices);
 
   backRatios.forEach((ratio, index) => {
     const target = Math.round(ratio * (total - 1));
     if (target <= 1 || target >= total - 1) return;
     if (target === marriageIndex || target === jobIndex) return;
+    if (careerSet.has(target)) return;
     const steps = index % 2 === 0 ? 3 : 4;
     backSpaces.set(target, steps);
   });
@@ -1860,11 +1904,13 @@ function buildSpecialSpaces(total) {
     const target = Math.round(ratio * (total - 1));
     if (target <= 1 || target >= total - 1) return;
     if (target === marriageIndex || target === jobIndex) return;
+    if (careerSet.has(target)) return;
     if (backSpaces.has(target)) return;
     restSpaces.add(target);
   });
 
-  return { marriageIndex, jobIndex, backSpaces, restSpaces };
+  careerIndices.sort((a, b) => a - b);
+  return { marriageIndex, jobIndex, careerIndices, backSpaces, restSpaces };
 }
 
 function buildBoardTypes(total, special = {}) {
@@ -1876,6 +1922,8 @@ function buildBoardTypes(total, special = {}) {
   }
   const marriageIndex = Number.isFinite(special.marriageIndex) ? special.marriageIndex : -1;
   const jobIndex = Number.isFinite(special.jobIndex) ? special.jobIndex : -1;
+  const careerIndices = Array.isArray(special.careerIndices) ? special.careerIndices : [];
+  const careerSet = new Set(careerIndices);
   const backSpaces = special.backSpaces || new Map();
   const restSpaces = special.restSpaces || new Set();
   if (marriageIndex > 0 && marriageIndex < total - 1) {
@@ -1884,8 +1932,19 @@ function buildBoardTypes(total, special = {}) {
   if (jobIndex > 0 && jobIndex < total - 1 && jobIndex !== marriageIndex) {
     types[jobIndex] = "job";
   }
+  careerIndices.forEach((index) => {
+    if (
+      index > 0 &&
+      index < total - 1 &&
+      index !== marriageIndex &&
+      index !== jobIndex &&
+      !backSpaces.has(index)
+    ) {
+      types[index] = "career";
+    }
+  });
   backSpaces.forEach((_, index) => {
-    if (index > 0 && index < total - 1 && index !== marriageIndex && index !== jobIndex) {
+    if (index > 0 && index < total - 1 && index !== marriageIndex && index !== jobIndex && !careerSet.has(index)) {
       types[index] = "back";
     }
   });
@@ -1895,6 +1954,7 @@ function buildBoardTypes(total, special = {}) {
       index < total - 1 &&
       index !== marriageIndex &&
       index !== jobIndex &&
+      !careerSet.has(index) &&
       !backSpaces.has(index)
     ) {
       types[index] = "rest";
@@ -2680,6 +2740,10 @@ function handleRoll() {
     if (shouldStopForJob(player, steps)) {
       stopTargets.push(JOB_INDEX);
     }
+    const careerStop = getCareerStopIndex(player, steps);
+    if (Number.isFinite(careerStop)) {
+      stopTargets.push(careerStop);
+    }
     if (stopTargets.length) {
       const stopAt = Math.min(...stopTargets);
       steps = Math.max(0, stopAt - player.position);
@@ -2940,6 +3004,12 @@ function shouldStopForJob(player, steps) {
   return player.position + steps >= JOB_INDEX;
 }
 
+function getCareerStopIndex(player, steps) {
+  if (!player || !CAREER_INDICES.length) return null;
+  const target = CAREER_INDICES.find((index) => player.position < index && player.position + steps >= index);
+  return Number.isFinite(target) ? target : null;
+}
+
 function getBackSteps(index) {
   return BACK_SPACES.get(index) || 0;
 }
@@ -3096,11 +3166,215 @@ function pickCpuSpouse() {
   return SPOUSES[Math.floor(Math.random() * SPOUSES.length)];
 }
 
+function showCareerEvent() {
+  const player = currentPlayer();
+  state.currentEvent = null;
+  setPhase("event");
+  updateUI();
+  const job = getPlayerJob(player);
+  if (job && isCareerAtRisk(player, job)) {
+    applyCareerLayoff(player, job);
+    return;
+  }
+  if (isCpuPlayer(player)) {
+    handleCpuCareerDecision(player, job);
+    return;
+  }
+  openCareerModal();
+}
+
+function openCareerModal() {
+  if (!elements.careerModal) return;
+  renderCareerModal();
+  elements.careerModal.classList.add("show");
+  elements.careerModal.setAttribute("aria-hidden", "false");
+}
+
+function closeCareerModal() {
+  if (!elements.careerModal) return;
+  clearModalFocus(elements.careerModal);
+  elements.careerModal.classList.remove("show");
+  elements.careerModal.setAttribute("aria-hidden", "true");
+}
+
+function renderCareerModal() {
+  const player = currentPlayer();
+  const job = getPlayerJob(player);
+  if (!elements.careerCurrent || !elements.careerRequirements) return;
+  if (elements.careerTitle) {
+    elements.careerTitle.textContent = "승진 및 이직";
+  }
+  if (elements.careerSubtitle) {
+    elements.careerSubtitle.textContent = "조건을 만족하면 승진하거나 이직을 선택할 수 있습니다.";
+  }
+  const jobName = job?.name || player.jobName || "직업 없음";
+  const salary = job ? getPlayerJobSalary(player, job) : 0;
+  elements.careerCurrent.innerHTML = [
+    `<div class="career-line"><span class="career-label">현재 직업</span><span class="career-value">${jobName}</span></div>`,
+    `<div class="career-line"><span class="career-label">현재 월급</span><span class="career-value">${formatResourceValue("money", salary)}</span></div>`
+  ].join("");
+  const promotionReq = job ? formatCareerRequirement(job, "promotion", player) : "승진 불가";
+  const transferReq = `선택 직업 주 능력 Lv.${CAREER_TRANSFER_LEVEL} 이상 (고급 직업 Lv.${CAREER_TRANSFER_LEVEL_HIGH} 이상)`;
+  const riskNote = "Lv.2 이하일 경우 실직합니다.";
+  elements.careerRequirements.innerHTML = [
+    `<div class="career-line"><span class="career-label">승진 조건</span><span class="career-value">${promotionReq}</span></div>`,
+    `<div class="career-line"><span class="career-label">이직 조건</span><span class="career-value">${transferReq}</span></div>`,
+    `<div class="career-note">${riskNote}</div>`
+  ].join("");
+  if (elements.careerPromote) {
+    elements.careerPromote.disabled = !job;
+  }
+}
+
+function handleCareerPromote() {
+  const player = currentPlayer();
+  const job = getPlayerJob(player);
+  if (!job) {
+    showSystemModal({
+      title: "승진 불가",
+      story: "현재 직업이 없어 승진할 수 없습니다.",
+      variant: "alert",
+      autoClose: isCpuPlayer(player)
+    });
+    return;
+  }
+  closeCareerModal();
+  if (isCareerAtRisk(player, job)) {
+    applyCareerLayoff(player, job);
+    return;
+  }
+  if (!isCareerEligible(player, job, "promotion")) {
+    showSystemModal({
+      title: "승진 실패",
+      story: `승진 조건이 부족합니다. (${formatCareerRequirement(job, "promotion", player)})`,
+      variant: "alert",
+      autoClose: isCpuPlayer(player)
+    });
+    queueCareerContinue(player);
+    return;
+  }
+  applyCareerPromotion(player, job);
+}
+
+function handleCareerTransfer() {
+  const player = currentPlayer();
+  const eligible = JOBS.filter((job) => isJobEligible(player, job, "transfer"));
+  if (!eligible.length) {
+    closeCareerModal();
+    showSystemModal({
+      title: "이직 불가",
+      story: "이직 조건을 만족하는 직업이 없습니다.",
+      variant: "alert",
+      autoClose: isCpuPlayer(player)
+    });
+    queueCareerContinue(player);
+    return;
+  }
+  state.jobSelectionMode = "transfer";
+  closeCareerModal();
+  openJobModal();
+}
+
+function handleCareerStay() {
+  const player = currentPlayer();
+  closeCareerModal();
+  applyCareerStay(player);
+}
+
+function handleCpuCareerDecision(player, job) {
+  if (!player) return;
+  if (job && isCareerAtRisk(player, job)) {
+    applyCareerLayoff(player, job);
+    return;
+  }
+  const canPromote = job ? isCareerEligible(player, job, "promotion") : false;
+  const transferJob = pickCpuTransferJob(player);
+  if (canPromote && (!transferJob || Math.random() < 0.6)) {
+    applyCareerPromotion(player, job);
+    return;
+  }
+  if (transferJob) {
+    applyCareerTransfer(player, transferJob);
+    return;
+  }
+  applyCareerStay(player);
+}
+
+function queueCareerContinue(player) {
+  pendingResultAction = () => {
+    setPhase("action");
+    updateUI();
+    scheduleCpuAction();
+  };
+}
+
+function applyCareerLayoff(player, job) {
+  if (!player) return;
+  closeCareerModal();
+  player.jobId = null;
+  player.jobName = "실직";
+  player.jobSalary = 0;
+  player.jobEffects = null;
+  addLog(`${player.name} - 실직`, { player });
+  showSystemModal({
+    title: "실직",
+    story: `${job?.name || "직업"}에서 실직했다. 다시 기회를 노려야 한다.`,
+    sections: [{ title: player.name, effects: {} }],
+    variant: "alert",
+    autoClose: isCpuPlayer(player)
+  });
+  queueCareerContinue(player);
+}
+
+function applyCareerPromotion(player, job) {
+  if (!player || !job) return;
+  const currentSalary = getPlayerJobSalary(player, job);
+  const targetSalary = Math.round(job.salary * CAREER_PROMOTION_MULTIPLIER);
+  const promotedSalary = Math.max(currentSalary, targetSalary);
+  setJobForPlayer(player, job.id, { salary: promotedSalary });
+  addLog(`${player.name} - 승진: ${job.name}`, { player });
+  showSystemModal({
+    title: "승진",
+    story: `${job.name}에서 승진했다. 월급이 ${formatResourceValue("money", promotedSalary)}로 상승했다.`,
+    sections: [{ title: player.name, effects: {} }],
+    variant: "system",
+    autoClose: isCpuPlayer(player)
+  });
+  queueCareerContinue(player);
+}
+
+function applyCareerTransfer(player, job) {
+  if (!player || !job) return;
+  const salary = getJobSalaryForMode(job, "transfer");
+  setJobForPlayer(player, job.id, { salary });
+  addLog(`${player.name} - 이직: ${job.name}`, { player });
+  showSystemModal({
+    title: "이직",
+    story: `${job.name}으로 이직했다. 월급이 ${formatResourceValue("money", salary)}로 설정됐다.`,
+    sections: [{ title: player.name, effects: {} }],
+    variant: "system",
+    autoClose: isCpuPlayer(player)
+  });
+  queueCareerContinue(player);
+}
+
+function applyCareerStay(player) {
+  showSystemModal({
+    title: "현직 유지",
+    story: "이번에는 현재 직업을 유지하기로 했다.",
+    sections: [{ title: player.name, effects: {} }],
+    variant: "system",
+    autoClose: isCpuPlayer(player)
+  });
+  queueCareerContinue(player);
+}
+
 function showJobEvent() {
   const player = currentPlayer();
   state.currentEvent = null;
   setPhase("event");
   updateUI();
+  state.jobSelectionMode = "initial";
   if (isCpuPlayer(player)) {
     const job = pickCpuJob(player);
     const assigned = job ? setJobForPlayer(player, job.id) : null;
@@ -3113,6 +3387,7 @@ function showJobEvent() {
 function openJobModal() {
   if (!elements.jobModal) return;
   state.jobPage = 0;
+  syncJobModalHeader();
   renderJobModal();
   elements.jobModal.classList.add("show");
   elements.jobModal.setAttribute("aria-hidden", "false");
@@ -3122,11 +3397,43 @@ function closeJobModal() {
   if (!elements.jobModal) return;
   elements.jobModal.classList.remove("show");
   elements.jobModal.setAttribute("aria-hidden", "true");
+  state.jobSelectionMode = "initial";
 }
 
-function formatJobEffectSummary(job) {
+function getJobSelectionMode() {
+  return state.jobSelectionMode || "initial";
+}
+
+function syncJobModalHeader() {
+  if (!elements.jobTitle || !elements.jobSubtitle) return;
+  const mode = getJobSelectionMode();
+  if (mode === "transfer") {
+    elements.jobTitle.textContent = "이직 선택";
+    elements.jobSubtitle.textContent = "이직 시 월급이 기본 급여의 2배로 설정됩니다.";
+  } else {
+    elements.jobTitle.textContent = "직업 선택";
+    elements.jobSubtitle.textContent = "월급과 영향을 고려해 직업을 골라주세요.";
+  }
+}
+
+function getJobSalaryForMode(job, mode = "initial") {
+  if (!job) return 0;
+  if (mode === "transfer") {
+    return Math.round(job.salary * CAREER_TRANSFER_MULTIPLIER);
+  }
+  return job.salary;
+}
+
+function getPlayerJobSalary(player, job) {
+  const stored = Number.isFinite(player?.jobSalary) ? player.jobSalary : 0;
+  if (stored > 0) return stored;
+  return job?.salary || 0;
+}
+
+function formatJobEffectSummary(job, mode = "initial") {
   if (!job) return "";
-  const parts = [`월급 ${formatResourceValue("money", job.salary)}`];
+  const salary = getJobSalaryForMode(job, mode);
+  const parts = [`월급 ${formatResourceValue("money", salary)}`];
   const effects = job.effects || {};
   Object.entries(effects).forEach(([key, value]) => {
     if (!value) return;
@@ -3136,12 +3443,84 @@ function formatJobEffectSummary(job) {
   return parts.join(" / ");
 }
 
-function getJobRequirement(job) {
+function deriveCareerKey(job) {
+  if (!job) return "growth";
+  if (job.requirement?.key) return job.requirement.key;
+  if (job.careerKey) return job.careerKey;
+  const effects = job.effects || {};
+  let bestKey = "growth";
+  let bestValue = -Infinity;
+  ["growth", "reputation", "health"].forEach((key) => {
+    const value = effects[key] || 0;
+    if (value > bestValue) {
+      bestValue = value;
+      bestKey = key;
+    }
+  });
+  if (bestValue <= 0) return "growth";
+  return bestKey;
+}
+
+function getCareerRequirementLevel(job, mode) {
+  const highTier = (job?.salary || 0) >= CAREER_HIGH_SALARY;
+  if (mode === "promotion") {
+    return highTier ? CAREER_PROMOTION_LEVEL_HIGH : CAREER_PROMOTION_LEVEL;
+  }
+  return highTier ? CAREER_TRANSFER_LEVEL_HIGH : CAREER_TRANSFER_LEVEL;
+}
+
+function getCareerRequirement(job, mode) {
+  if (!job) return null;
+  const key = job.careerKey || deriveCareerKey(job);
+  const minLevel = getCareerRequirementLevel(job, mode);
+  const label = RESOURCE_LABELS[key] || key;
+  return { key, minLevel, label };
+}
+
+function formatCareerRequirement(job, mode, player) {
+  const requirement = getCareerRequirement(job, mode);
+  if (!requirement) return "";
+  const current = player ? getStatLevel(player[requirement.key] || 0) : null;
+  const currentText = Number.isFinite(current) ? ` (현재 Lv.${current})` : "";
+  return `${requirement.label} Lv.${requirement.minLevel} 이상${currentText}`;
+}
+
+function isCareerEligible(player, job, mode) {
+  const requirement = getCareerRequirement(job, mode);
+  if (!requirement) return false;
+  const current = player?.[requirement.key] ?? 0;
+  return getStatLevel(current) >= requirement.minLevel;
+}
+
+function isCareerAtRisk(player, job) {
+  const requirement = getCareerRequirement(job, "promotion");
+  if (!requirement) return false;
+  const current = player?.[requirement.key] ?? 0;
+  return getStatLevel(current) <= CAREER_FIRE_LEVEL;
+}
+
+function getPlayerJob(player) {
+  if (!player?.jobId) return null;
+  const found = JOBS.find((entry) => entry.id === player.jobId);
+  if (found) return found;
+  return {
+    id: player.jobId,
+    name: player.jobName,
+    salary: player.jobSalary,
+    effects: player.jobEffects || null,
+    careerKey: deriveCareerKey({ effects: player.jobEffects || {} })
+  };
+}
+
+function getJobRequirement(job, mode = "initial") {
+  if (mode === "transfer") {
+    return getCareerRequirement(job, "transfer");
+  }
   return job?.requirement || null;
 }
 
-function isJobEligible(player, job) {
-  const requirement = getJobRequirement(job);
+function isJobEligible(player, job, mode = "initial") {
+  const requirement = getJobRequirement(job, mode);
   if (!requirement) return true;
   const current = player?.[requirement.key] ?? 0;
   if (Number.isFinite(requirement.minLevel)) {
@@ -3150,8 +3529,8 @@ function isJobEligible(player, job) {
   return current >= (requirement.min ?? 0);
 }
 
-function formatJobRequirement(job) {
-  const requirement = getJobRequirement(job);
+function formatJobRequirement(job, mode = "initial") {
+  const requirement = getJobRequirement(job, mode);
   if (!requirement) return "";
   const label = requirement.label || RESOURCE_LABELS[requirement.key] || requirement.key;
   if (Number.isFinite(requirement.minLevel)) {
@@ -3163,6 +3542,7 @@ function formatJobRequirement(job) {
 function renderJobModal() {
   if (!elements.jobList) return;
   const player = currentPlayer();
+  const mode = getJobSelectionMode();
   const totalPages = Math.max(1, Math.ceil(JOBS.length / JOB_PAGE_SIZE));
   state.jobPage = clamp(state.jobPage, 0, totalPages - 1);
   if (elements.jobPage) {
@@ -3172,7 +3552,7 @@ function renderJobModal() {
   const start = state.jobPage * JOB_PAGE_SIZE;
   const pageItems = JOBS.slice(start, start + JOB_PAGE_SIZE);
   pageItems.forEach((job) => {
-    const eligible = isJobEligible(player, job);
+    const eligible = isJobEligible(player, job, mode);
     const card = document.createElement("div");
     card.className = "job-option";
     if (!eligible) {
@@ -3183,8 +3563,8 @@ function renderJobModal() {
     name.textContent = job.name;
     const pay = document.createElement("div");
     pay.className = "job-pay";
-    pay.textContent = formatJobEffectSummary(job);
-    const requirement = formatJobRequirement(job);
+    pay.textContent = formatJobEffectSummary(job, mode);
+    const requirement = formatJobRequirement(job, mode);
     let requirementLine = null;
     if (requirement) {
       requirementLine = document.createElement("div");
@@ -3200,7 +3580,7 @@ function renderJobModal() {
       selectBtn.classList.add("disabled");
       selectBtn.textContent = "조건 부족";
     } else {
-      selectBtn.textContent = "선택";
+      selectBtn.textContent = mode === "transfer" ? "이직" : "선택";
     }
     card.appendChild(name);
     card.appendChild(pay);
@@ -3225,13 +3605,19 @@ function handleJobSelect(event) {
   const player = currentPlayer();
   const job = jobId ? JOBS.find((entry) => entry.id === jobId) : null;
   if (!job) return;
-  if (!isJobEligible(player, job)) {
+  const mode = getJobSelectionMode();
+  if (!isJobEligible(player, job, mode)) {
     showSystemModal({
       title: "조건 부족",
-      story: `${job.name}은(는) ${formatJobRequirement(job)} 필요합니다.`,
+      story: `${job.name}은(는) ${formatJobRequirement(job, mode)} 필요합니다.`,
       variant: "alert",
       autoClose: isCpuPlayer(player)
     });
+    return;
+  }
+  if (mode === "transfer") {
+    const assigned = setJobForPlayer(player, jobId, { salary: getJobSalaryForMode(job, "transfer") });
+    finalizeTransferSelection(player, assigned);
     return;
   }
   const assigned = setJobForPlayer(player, jobId);
@@ -3240,8 +3626,9 @@ function handleJobSelect(event) {
 
 function finalizeJobSelection(player, job) {
   closeJobModal();
+  state.jobSelectionMode = "initial";
   if (!job) return;
-  const summary = formatJobEffectSummary(job);
+  const summary = formatJobEffectSummary(job, "initial");
   addLog(`${player.name} - 직업 선택: ${job.name}`, { player });
   showSystemModal({
     title: "직업 선택",
@@ -3257,9 +3644,30 @@ function finalizeJobSelection(player, job) {
   };
 }
 
-function scoreJobForPlayer(player, job) {
+function finalizeTransferSelection(player, job) {
+  closeJobModal();
+  state.jobSelectionMode = "initial";
+  if (!job) return;
+  const salary = Number.isFinite(player?.jobSalary) ? player.jobSalary : getJobSalaryForMode(job, "transfer");
+  addLog(`${player.name} - 이직: ${job.name}`, { player });
+  showSystemModal({
+    title: "이직",
+    story: `${job.name}으로 이직했다. 월급이 ${formatResourceValue("money", salary)}로 설정됐다.`,
+    sections: [{ title: player.name, effects: {} }],
+    variant: "system",
+    autoClose: isCpuPlayer(player)
+  });
+  pendingResultAction = () => {
+    setPhase("action");
+    updateUI();
+    scheduleCpuAction();
+  };
+}
+
+function scoreJobForPlayer(player, job, salaryOverride) {
   const effects = { ...(job.effects || {}) };
-  effects.money = (effects.money || 0) + job.salary / MONEY_SCALE;
+  const salary = Number.isFinite(salaryOverride) ? salaryOverride : job.salary;
+  effects.money = (effects.money || 0) + salary / MONEY_SCALE;
   return scoreEffectsForPlayer(effects, player);
 }
 
@@ -3268,6 +3676,19 @@ function pickCpuJob(player) {
   const eligibleJobs = JOBS.filter((job) => isJobEligible(player, job));
   const pool = eligibleJobs.length ? eligibleJobs : JOBS;
   const scored = pool.map((job) => ({ job, score: scoreJobForPlayer(player, job) }));
+  scored.sort((a, b) => b.score - a.score);
+  const pickFrom = scored.slice(0, Math.min(5, scored.length));
+  return pickFrom[Math.floor(Math.random() * pickFrom.length)].job;
+}
+
+function pickCpuTransferJob(player) {
+  if (!JOBS.length) return null;
+  const eligibleJobs = JOBS.filter((job) => isJobEligible(player, job, "transfer"));
+  if (!eligibleJobs.length) return null;
+  const scored = eligibleJobs.map((job) => ({
+    job,
+    score: scoreJobForPlayer(player, job, getJobSalaryForMode(job, "transfer"))
+  }));
   scored.sort((a, b) => b.score - a.score);
   const pickFrom = scored.slice(0, Math.min(5, scored.length));
   return pickFrom[Math.floor(Math.random() * pickFrom.length)].job;
@@ -3322,6 +3743,10 @@ function handleLanding(player) {
   }
   if (spaceType === "job" && !player.jobId) {
     showJobEvent();
+    return;
+  }
+  if (spaceType === "career") {
+    showCareerEvent();
     return;
   }
   if (spaceType === "back") {
@@ -4199,7 +4624,7 @@ function meetsEndingRange(value, min, max) {
 
 const LOG_TAG_PATTERNS = {
   marriage: { label: "결혼", pattern: /결혼/ },
-  job: { label: "직업", pattern: /직업|월급/ },
+  job: { label: "직업", pattern: /직업|월급|승진|이직|실직/ },
   trade: { label: "투자/매매", pattern: /투자|매입|매도|자산|시장/ },
   project: { label: "도시 프로젝트", pattern: /프로젝트/ },
   help: { label: "도움", pattern: /도움/ },
@@ -4752,13 +5177,14 @@ function setSpouseForPlayer(player, spouseId) {
   return spouse;
 }
 
-function setJobForPlayer(player, jobId) {
+function setJobForPlayer(player, jobId, options = {}) {
   if (!player || !jobId) return null;
   const job = JOBS.find((entry) => entry.id === jobId);
   if (!job) return null;
+  const salary = Number.isFinite(options.salary) ? options.salary : job.salary;
   player.jobId = job.id;
   player.jobName = job.name;
-  player.jobSalary = job.salary;
+  player.jobSalary = salary;
   player.jobEffects = job.effects || null;
   return job;
 }
@@ -4805,7 +5231,8 @@ function applyJobBonus(player, rollMultiplier = 1) {
   const job = JOBS.find((entry) => entry.id === player.jobId);
   if (!job) return null;
   const multiplier = Number.isFinite(rollMultiplier) ? Math.max(1, Math.round(rollMultiplier)) : 1;
-  const salary = job.salary * multiplier;
+  const baseSalary = getPlayerJobSalary(player, job);
+  const salary = baseSalary * multiplier;
   const moneyApplied = applyMoneyDelta(player, salary, { skipBankruptcy: true });
   const statApplied = applyEffects(player, job.effects || {});
   const combined = { ...statApplied };
@@ -5021,7 +5448,8 @@ function renderJobInfoModal(player) {
   const jobLabel = player.jobName ? `직업: ${player.jobName}` : "직업: 미정";
   elements.jobInfoTitle.textContent = `${player.name} · ${jobLabel}`;
   if (!player.jobId) {
-    appendInfoSection(elements.jobInfoBody, "상태", "직업 선택을 기다리는 중이다.");
+    const status = player.jobName === "실직" ? "실직 상태다. 다음 기회를 노려야 한다." : "직업 선택을 기다리는 중이다.";
+    appendInfoSection(elements.jobInfoBody, "상태", status);
     return;
   }
   const job = JOBS.find((entry) => entry.id === player.jobId) || {
@@ -5034,11 +5462,13 @@ function renderJobInfoModal(player) {
   if (requirement) {
     appendInfoSection(elements.jobInfoBody, "선택 조건", requirement);
   }
-  appendInfoSection(
-    elements.jobInfoBody,
-    "월급",
-    `기본 ${formatResourceValue("money", job.salary || 0)} (룰렛 배수 적용)`
-  );
+  const baseSalary = job.salary || 0;
+  const currentSalary = getPlayerJobSalary(player, job);
+  const salaryLine =
+    baseSalary && currentSalary !== baseSalary
+      ? `현재 ${formatResourceValue("money", currentSalary)} (기본 ${formatResourceValue("money", baseSalary)})`
+      : `현재 ${formatResourceValue("money", currentSalary)}`;
+  appendInfoSection(elements.jobInfoBody, "월급", `${salaryLine} (룰렛 배수 적용)`);
   appendInfoSection(
     elements.jobInfoBody,
     "매턴 효과",
