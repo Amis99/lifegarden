@@ -87,6 +87,15 @@ const STAT_LEVELS = [
   { level: 4, max: Infinity }
 ];
 const ENDING_PROFIT_THRESHOLD = 5;
+const CRISIS_THRESHOLD = 10000;
+const CRISIS_EVENT_TURNS = 3;
+const CRISIS_GAMEOVER_TURNS = 5;
+const CRISIS_STATUS = {
+  happiness: { label: "우울증", event: "divorce" },
+  health: { label: "질병", event: "layoff" },
+  growth: { label: "무능", event: "divorce" },
+  reputation: { label: "소외", event: "layoff" }
+};
 
 const RESOURCE_RULES = {
   money: { min: 0, max: MONEY_MAX, scale: MONEY_SCALE },
@@ -387,48 +396,65 @@ const ACTION_RESULT_STORIES = {
   }
 };
 
-const SPOUSE_TRAITS = {
+const SPOUSE_PROS = {
   appearance: {
     label: "외모",
-    timed: { turns: 5, every: 1, effects: { happiness: 1 } },
-    penalty: { money: -3 },
-    penaltyLabel: "지출 증가"
+    timed: { turns: 5, every: 1, effects: { happiness: 1 } }
   },
   care: {
     label: "간호",
-    perTurn: { health: 1 },
-    penalty: { growth: -0.3 },
-    penaltyLabel: "자기계발 감소"
+    perTurn: { health: 0.2 }
   },
   kindness: {
     label: "다정함",
-    perTurn: { happiness: 1 },
-    penalty: { money: -2 },
-    penaltyLabel: "지출 증가"
+    perTurn: { happiness: 0.1 }
   },
   planning: {
     label: "계획적",
-    perTurn: { growth: 1 },
-    penalty: { happiness: -0.3 },
-    penaltyLabel: "즉흥성 감소"
+    perTurn: { growth: 0.2 }
   },
   diligence: {
     label: "성실함",
-    perTurn: { money: 3 },
-    penalty: { health: -0.3 },
-    penaltyLabel: "피로 누적"
+    perTurn: { money: 3 }
   },
   talent: {
     label: "능력",
-    perTurn: { reputation: 1, growth: 0.5 },
-    penalty: { happiness: -0.3 },
-    penaltyLabel: "부담 증가"
+    perTurn: { growth: 0.1 }
   },
   humor: {
     label: "유머",
-    perTurn: { happiness: 1, reputation: 0.5 },
-    penalty: { growth: -0.3 },
-    penaltyLabel: "집중 저하"
+    perTurn: { reputation: 0.2 }
+  }
+};
+
+const SPOUSE_CONS = {
+  unfaithful: {
+    label: "불성실함",
+    perTurn: { money: -2 }
+  },
+  impulsive: {
+    label: "즉흥성",
+    perTurn: { growth: -0.1 }
+  },
+  overspend: {
+    label: "과소비",
+    perTurn: { money: -3 }
+  },
+  indifferent: {
+    label: "무관심",
+    perTurn: { reputation: -0.1 }
+  },
+  stubborn: {
+    label: "고집",
+    perTurn: { happiness: -0.1 }
+  },
+  pessimistic: {
+    label: "비관적",
+    perTurn: { happiness: -0.2 }
+  },
+  careless: {
+    label: "부주의",
+    perTurn: { health: -0.1 }
   }
 };
 
@@ -439,112 +465,112 @@ const SPOUSES = [
     id: "spouse_f1",
     name: "하윤",
     gender: "female",
-    origin: "한국",
-    traits: ["kindness", "planning"],
-    description: "다정하고 계획적인 동반자"
+    advantages: ["kindness", "planning"],
+    disadvantages: ["indifferent", "careless"],
+    description: "다정함과 계획성이 돋보이는 동반자"
   },
   {
     id: "spouse_f2",
     name: "서연",
     gender: "female",
-    origin: "일본",
-    traits: ["care", "diligence"],
-    description: "돌봄과 성실함이 조화로운 동반자"
+    advantages: ["care", "diligence"],
+    disadvantages: ["impulsive", "stubborn"],
+    description: "돌봄과 성실함으로 든든한 동반자"
   },
   {
     id: "spouse_f3",
     name: "지우",
     gender: "female",
-    origin: "스페인",
-    traits: ["appearance", "humor"],
-    description: "밝은 매력과 유머를 가진 동반자"
+    advantages: ["appearance", "humor"],
+    disadvantages: ["impulsive", "overspend"],
+    description: "빛나는 매력과 유머가 있는 동반자"
   },
   {
     id: "spouse_f4",
     name: "수빈",
     gender: "female",
-    origin: "러시아",
-    traits: ["talent", "planning"],
-    description: "능력과 계획성이 두드러지는 동반자"
+    advantages: ["talent", "planning"],
+    disadvantages: ["indifferent", "stubborn"],
+    description: "능력과 계획성이 조화로운 동반자"
   },
   {
     id: "spouse_f5",
     name: "예은",
     gender: "female",
-    origin: "이집트",
-    traits: ["kindness", "care"],
+    advantages: ["kindness", "care"],
+    disadvantages: ["impulsive", "overspend"],
     description: "따뜻한 돌봄이 강점인 동반자"
   },
   {
     id: "spouse_f6",
     name: "민지",
     gender: "female",
-    origin: "인도",
-    traits: ["humor", "diligence"],
+    advantages: ["humor", "diligence"],
+    disadvantages: ["careless", "stubborn"],
     description: "유머와 성실함으로 힘이 되는 동반자"
   },
   {
     id: "spouse_f7",
     name: "지민",
     gender: "female",
-    origin: "폴란드",
-    traits: ["appearance", "talent"],
-    description: "빛나는 매력과 능력을 갖춘 동반자"
+    advantages: ["appearance", "talent"],
+    disadvantages: ["indifferent", "overspend"],
+    description: "매력과 능력이 두드러지는 동반자"
   },
   {
     id: "spouse_m1",
     name: "민준",
     gender: "male",
-    origin: "한국",
-    traits: ["diligence", "planning"],
+    advantages: ["diligence", "planning"],
+    disadvantages: ["indifferent", "pessimistic"],
     description: "성실함과 계획성이 돋보이는 동반자"
   },
   {
     id: "spouse_m2",
     name: "서준",
     gender: "male",
-    origin: "일본",
-    traits: ["humor", "care"],
+    advantages: ["humor", "care"],
+    disadvantages: ["impulsive", "stubborn"],
     description: "유머와 돌봄이 자연스러운 동반자"
   },
   {
     id: "spouse_m3",
     name: "도윤",
     gender: "male",
-    origin: "이탈리아",
-    traits: ["appearance", "planning"],
+    advantages: ["appearance", "planning"],
+    disadvantages: ["indifferent", "overspend"],
     description: "매력과 계획성이 균형 잡힌 동반자"
   },
   {
     id: "spouse_m4",
     name: "지후",
     gender: "male",
-    origin: "스페인",
-    traits: ["talent", "humor"],
+    advantages: ["talent", "humor"],
+    disadvantages: ["stubborn", "careless"],
     description: "능력과 유머가 조화를 이루는 동반자"
   },
   {
     id: "spouse_m5",
     name: "하준",
     gender: "male",
-    origin: "미국",
-    traits: ["kindness", "diligence"],
+    advantages: ["kindness", "diligence"],
+    disadvantages: ["impulsive", "indifferent"],
     description: "다정함과 성실함이 든든한 동반자"
   },
   {
     id: "spouse_m6",
     name: "준우",
     gender: "male",
-    origin: "모로코",
-    traits: ["care", "planning"],
+    advantages: ["care", "planning"],
+    disadvantages: ["stubborn", "overspend"],
     description: "돌봄과 계획성으로 지지하는 동반자"
   },
   {
     id: "spouse_m7",
     name: "현우",
     gender: "male",
-    origin: "캐나다",
-    traits: ["appearance", "talent"],
+    advantages: ["appearance", "talent"],
+    disadvantages: ["indifferent", "careless"],
     description: "매력과 능력이 두드러지는 동반자"
   }
 ];
@@ -612,12 +638,50 @@ JOBS.forEach((job) => {
 });
 
 const DEFAULT_ENDING = {
-  title: "닮은 인생 : 어린 왕자",
+  title: "닮은 인생 : 이름 없는 주인공",
   story:
-    "지난 날의 선택들은 어린 왕자가 별을 떠돌며 배운 마음처럼 순수했으며, 노년의 그는 화려함보다 작은 약속을 지킨 시간이 가장 빛났다고 말했다. 그는 그 별들을 떠올리며 삶을 조용히 정리했다."
+    "지난 선택들은 대단한 영웅담보다 생활 속 잔재주에 가까웠고, 노년의 그는 그게 오히려 오래 남았다고 웃었다. 큰 서사 대신 작은 습관이 이야기를 만들었고, 그는 자신의 인생을 스스로 편집한 주인공이 되었다."
 };
 
-const ENDING_STORIES = [
+const DEFAULT_GAME_OVER_ENDING = {
+  title: "닮은 인생 : 중도 하차자",
+  story:
+    "여정은 중간에서 멈췄지만, 포기한 이야기는 끝난 이야기가 아니었다. 그는 다시 시작을 위한 숨 고르기를 하며 다음 판에는 자신의 리듬을 더 잘 지켜보겠다고 말했다."
+};
+
+const GAME_OVER_ENDINGS = [
+  [
+    "joker",
+    "조커",
+    "웃음을 무기로 버텼지만 결국 웃음이 폭죽처럼 터져 주변을 놀라게 했다. 노년의 그는 웃기려다 진지해질 때가 가장 힘들었다며 다시 균형을 찾으려 했다."
+  ],
+  [
+    "voldemort",
+    "볼드모트",
+    "모든 걸 통제하려다 마음이 둘로 갈라졌고, 남은 건 차가운 계획표였다. 노년의 그는 실적은 완벽했는데 친구가 없더라고 씁쓸하게 웃었다."
+  ],
+  [
+    "scar",
+    "스카",
+    "권력을 잡았지만 왕국이 텅 비어버린 스카의 그림자가 드리웠다. 노년의 그는 위에는 추웠고 아래에는 아무도 없었다며 뒤늦은 후회를 털어놨다."
+  ],
+  [
+    "ursula",
+    "우르술라",
+    "계약서로 모든 걸 해결하려 했지만 마음까지 서명되진 않았다. 노년의 그는 서류는 남았는데 노래는 사라졌다며 고개를 저었다."
+  ],
+  [
+    "hades",
+    "하데스",
+    "열정은 있었으나 문서 더미에 묻혀 버린 하데스처럼 바빴다. 노년의 그는 불꽃은 있는데 불난 줄 몰랐다며 다시 쉬어가기로 했다."
+  ]
+].map(([id, name, story]) => ({
+  id,
+  title: `닮은 인생 : ${name}`,
+  story
+}));
+
+const LEGACY_ENDING_STORIES = [
   {
     id: "ending-01",
     title: "닮은 인생 : 해리 포터",
@@ -899,6 +963,214 @@ const ENDING_STORIES = [
       "지난 날의 선택은 아하브 선장처럼 집념으로 항해를 이어갔고, 노년의 그는 그 집념이 때로는 자신을 아프게 했지만 끝내 삶을 깊게 했다고 말했다. 그는 먼 바다를 떠올리며 긴 숨을 내쉬었다."
   }
 ];
+
+const ENDING_STORIES = [
+  [
+    "hong-gildong",
+    "홍길동",
+    "약자 편을 들고 규칙의 틈을 비집던 모습이 홍길동을 닮았다. 덕분에 호칭은 의적이었지만, 노년의 그는 그 시절을 민원 해결사라고 부르며 웃었다. 그래도 남는 건 동네 사람들의 감사 인사였다."
+  ],
+  [
+    "simcheong",
+    "심청이",
+    "심청이처럼 자신보다 남을 먼저 생각해 물 속까지 뛰어들던 선택들이 있었다. 노년의 그는 용왕에게 상을 받은 건 아니지만, 가족의 미소가 그때의 진짜 보상이라고 말했다. 가끔은 효도 포인트가 과다 적립되었다며 농담도 던졌다."
+  ],
+  [
+    "chunhyang",
+    "춘향",
+    "약속을 지키는 고집과 자존심은 춘향의 이야기와 닮아 있었다. 시련 속에서도 흔들리지 않은 덕분에 노년의 그는 편지 한 장에도 설렘이 남았다고 했다. 암행어사보다 느린 답장이었지만 마음은 늘 도착했다."
+  ],
+  [
+    "heungbu",
+    "흥부",
+    "작은 베풂이 큰 보따리로 돌아왔던 흥부의 운이 곁에 있었다. 노년의 그는 박이 터질 때마다 놀부가 옆에서 가격표를 붙였을 것이라며 웃었다. 덕분에 선한 선택의 맛을 오래 기억했다."
+  ],
+  [
+    "nolbu",
+    "놀부",
+    "욕심이 앞섰다가도 결국 마음을 고쳐 먹는 놀부의 구도를 닮았다. 노년의 그는 배가 불러서가 아니라 마음이 비어서 변했다고 농담했다. 덕분에 남겨진 이야기는 욕심보다 화해에 가까웠다."
+  ],
+  [
+    "don-quixote",
+    "돈키호테",
+    "풍차를 거인으로 보던 돈키호테처럼 이상을 좇는 길을 택했다. 노년의 그는 현실이 자꾸 바람 부는 날씨 앱처럼 말썽이었다고 웃었다. 그래도 꿈을 쫓는 모험이 삶을 젊게 만들었다."
+  ],
+  [
+    "anne",
+    "앤 셜리",
+    "상상력으로 현실을 칠하던 앤 셜리처럼, 하루를 이야기로 바꾸는 재주가 있었다. 노년의 그는 말이 길어져도 끝까지 들어준 사람들을 최고의 선물로 꼽았다. 세상은 여전히 초록 지붕처럼 따뜻했다."
+  ],
+  [
+    "sherlock",
+    "셜록 홈즈",
+    "단서 하나로 세상을 재구성하던 셜록 홈즈의 냉정함이 엿보였다. 노년의 그는 여전히 티스푼을 들고 사건 대신 일상을 분석했다. 결론은 늘 하나, 차가 식기 전에 쉬어야 한다였다."
+  ],
+  [
+    "harry",
+    "해리 포터",
+    "위기마다 용기와 친구를 택한 모습이 해리 포터를 닮았다. 노년의 그는 마법은 없었지만, 동료의 응원은 주문보다 강했다고 말했다. 가끔은 지팡이 대신 리모컨을 들고도 당당했다."
+  ],
+  [
+    "hermione",
+    "헤르미온느",
+    "공부와 준비로 판을 뒤집는 모습이 헤르미온느 같았다. 노년의 그는 아직도 계획표를 접지 않고, 체크 표시를 붙일 때마다 뿌듯해했다. 가끔은 시험 대신 가족 모임을 준비했을 뿐이다."
+  ],
+  [
+    "frodo",
+    "프로도",
+    "힘든 짐을 끝까지 들고 간 모습이 프로도를 닮았다. 노년의 그는 발바닥보다 마음이 먼저 닳았다고 웃었지만, 동행의 힘을 가장 크게 기억했다. 반지는 없었어도 책임은 묵직했다."
+  ],
+  [
+    "aragorn",
+    "아라곤",
+    "지도 밖 길을 선택하고 결국 책임을 지는 모습이 아라곤 같았다. 노년의 그는 왕관 대신 편안한 모자를 썼지만, 사람들은 여전히 리더를 떠올렸다. 왕좌는 없었고 의자는 늘 한 칸 비어 있었다."
+  ],
+  [
+    "alice",
+    "앨리스",
+    "호기심으로 문을 열고 들어가는 선택이 앨리스를 닮았다. 노년의 그는 이상한 나라 대신 이상하게 빠른 시간을 경험했다고 했다. 그래도 찻잔을 든 웃음은 여전히 선명했다."
+  ],
+  [
+    "dorothy",
+    "도로시",
+    "집으로 돌아가기 위한 길이 길었던 도로시와 닮았다. 노년의 그는 빨간 구두 대신 편한 슬리퍼가 더 큰 마법이라고 말했다. 결국 집은 장소가 아니라 사람들의 목소리였다."
+  ],
+  [
+    "little-prince",
+    "어린 왕자",
+    "작은 약속과 시선을 지키려 했던 모습이 어린 왕자를 떠올리게 했다. 노년의 그는 양 그림 대신 장보기 목록을 들었지만, 중요한 건 마음의 별이었다. 여우와의 약속은 여전히 그의 생활 습관이었다."
+  ],
+  [
+    "peter-pan",
+    "피터 팬",
+    "자유와 모험을 놓지 않는 모습이 피터 팬을 닮았다. 노년의 그는 늙어도 어른 흉내만 했다고 농담했다. 다만 그림자는 가끔 냉장고 뒤에 숨는다고 덧붙였다."
+  ],
+  [
+    "wendy",
+    "웬디",
+    "이야기를 지키고 사람을 챙기는 선택이 웬디 같았다. 노년의 그는 여전히 주변의 작은 부탁을 동화처럼 풀어냈다. 덕분에 집안은 늘 이야기로 가득했다."
+  ],
+  [
+    "red-hood",
+    "빨간 모자",
+    "경계심과 호기심 사이를 오가던 모습이 빨간 모자를 닮았다. 노년의 그는 늑대 같은 일정도 조용히 지나쳤다고 말했다. 바구니 속에는 이제 간식 대신 메모가 들어 있었다."
+  ],
+  [
+    "cinderella",
+    "신데렐라",
+    "기회가 오면 놓치지 않는 태도가 신데렐라를 닮았다. 노년의 그녀는 유리 구두 대신 편한 운동화로도 무도회를 다녀왔다고 웃었다. 자정은 여전히 빠르지만 마음은 늦지 않았다."
+  ],
+  [
+    "rapunzel",
+    "라푼젤",
+    "높은 곳에서 오래 기다리던 마음이 라푼젤을 닮았다. 노년의 그는 머리카락 대신 긴 할 일을 내려보냈다고 농담했다. 결국 문을 연 건 기다림이 아니라 작은 용기였다."
+  ],
+  [
+    "aladdin",
+    "알라딘",
+    "순발력과 기지로 기회를 잡는 모습이 알라딘 같았다. 노년의 그는 램프 대신 오래된 지갑을 쓰다듬으며 소원은 계획표에 있었다고 말했다. 그래도 가끔은 요정에게 휴가를 부탁했다."
+  ],
+  [
+    "mulan",
+    "뮬란",
+    "자신을 숨기고 책임을 떠안던 선택이 뮬란을 닮았다. 노년의 그는 갑옷 대신 앞치마를 입고도 용기 있게 가족을 지켰다. 전장은 달라도 결심은 같았다."
+  ],
+  [
+    "robin-hood",
+    "로빈 후드",
+    "불균형을 보면 그냥 지나치지 못하던 모습이 로빈 후드와 닮았다. 노년의 그는 세금보다 무서운 건 냉장고 잔액이라고 웃었다. 그래도 나눔은 언제나 화살처럼 정확했다."
+  ],
+  [
+    "elizabeth-bennet",
+    "엘리자베스 베넷",
+    "재치와 자존심을 동시에 지키던 선택이 엘리자베스 베넷을 닮았다. 노년의 그녀는 우아한 반박 한 마디로 대화의 균형을 잡았다. 편견은 줄고 유머는 늘었다."
+  ],
+  [
+    "jane-eyre",
+    "제인 에어",
+    "스스로를 지키며 나아가던 모습이 제인 에어를 닮았다. 노년의 그녀는 나는 어디서든 나였어라고 말하며 미소 지었다. 벽난로가 아닌 마음이 따뜻했다."
+  ],
+  [
+    "gatsby",
+    "제이 개츠비",
+    "큰 꿈을 위해 불빛을 쫓던 모습이 개츠비를 닮았다. 노년의 그는 파티는 조용해졌지만, 마음속 초록 불빛은 여전히 깜빡였다고 했다. 화려함보다 남은 사람들의 이름이 더 중요해졌다."
+  ],
+  [
+    "huck-finn",
+    "허클베리 핀",
+    "규칙보다 자유를 선택한 길이 허클베리 핀과 닮았다. 노년의 그는 강 대신 골목길을 떠돌았지만, 모험심은 그대로였다. 가끔은 뗏목 대신 버스도 괜찮다고 말했다."
+  ],
+  [
+    "tom-sawyer",
+    "톰 소여",
+    "장난과 기지가 삶을 살찌운 모습이 톰 소여를 닮았다. 노년의 그는 울타리 칠하기를 최고의 협업 프로젝트라며 웃었다. 심각한 순간에도 장난기가 균형을 잡았다."
+  ],
+  [
+    "captain-nemo",
+    "네모 선장",
+    "깊은 곳으로 파고드는 집중이 네모 선장을 닮았다. 노년의 그는 바다 대신 책상 밑을 탐험하며 노틸러스호가 의자라고 농담했다. 그래도 탐구심은 바닷물처럼 짠했다."
+  ],
+  [
+    "odysseus",
+    "오디세우스",
+    "멀고 긴 길을 돌아 집으로 가는 모습이 오디세우스를 닮았다. 노년의 그는 사이렌의 유혹을 알림 소리로 비유하며 웃었다. 돌아오는 길이 길었지만 집은 늘 기다렸다."
+  ],
+  [
+    "conan",
+    "코난",
+    "진실을 끝까지 파헤치는 태도가 코난을 닮았다. 노년의 그는 사건보다 잃어버린 리모컨이 더 어려웠다고 한다. 그래도 범인은 바로 너 같은 멘트는 여전히 통쾌했다."
+  ],
+  [
+    "luffy",
+    "루피",
+    "동료를 믿고 끝까지 밀어주는 모습이 루피를 닮았다. 노년의 그는 고무처럼 늘어나는 일정도 웃으며 버텼다. 해적선 대신 식탁에서 위대한 항해를 말했다."
+  ],
+  [
+    "naruto",
+    "나루토",
+    "인정받기 위해 뚝심을 지키던 모습이 나루토를 닮았다. 노년의 그는 라면보다 따뜻한 칭찬 한 마디를 더 좋아했다. 결국 나도 할 수 있다는 주문은 현실이 되었다."
+  ],
+  [
+    "goku",
+    "손오공",
+    "수련과 배짱으로 벽을 넘던 모습이 손오공을 닮았다. 노년의 그는 여전히 식사량이 전설이라며 웃었다. 구름은 떠났지만 기세는 남았다."
+  ],
+  [
+    "eren",
+    "에렌",
+    "자유를 향한 분투가 에렌을 닮았다. 노년의 그는 벽이 사라져도 마음의 경계는 늘 점검해야 한다고 말했다. 무거운 질문을 끝까지 붙든 선택이 남았다."
+  ],
+  [
+    "spiderman",
+    "스파이더맨",
+    "책임과 일상을 동시에 붙잡던 모습이 스파이더맨 같았다. 노년의 그는 거미줄 대신 전화줄에 얽힌 약속을 풀었다며 웃었다. 큰 힘엔 큰 예약이 따라왔다."
+  ],
+  [
+    "batman",
+    "배트맨",
+    "밤에도 흔들리지 않는 결심이 배트맨을 닮았다. 노년의 그는 망토 대신 무릎담요를 덮고도 묵직한 결정을 내렸다. 어둠은 있었지만 이야기는 밝았다."
+  ],
+  [
+    "elsa",
+    "엘사",
+    "자기 마음을 받아들이는 과정이 엘사를 닮았다. 노년의 그녀는 얼음 대신 한숨을 녹이며 놓아줄 건 놓아줘야 한다고 말했다. 그래도 방 안의 온도는 따뜻했다."
+  ],
+  [
+    "anna",
+    "안나",
+    "사람을 향해 달려가는 선택이 안나를 닮았다. 노년의 그녀는 사소한 사건에도 같이 하자는 말을 잊지 않았다. 작은 포옹이 큰 겨울을 녹였다."
+  ],
+  [
+    "momo",
+    "모모",
+    "시간의 의미를 붙잡으려는 태도가 모모를 닮았다. 노년의 그는 바쁜 시계를 잠시 멈추고, 느린 대화를 최고의 사치라고 말했다. 시간 도둑은 여전히 있지만 그는 웃으며 이야기를 걸었다."
+  ]
+].map(([id, name, story]) => ({
+  id,
+  persona: id,
+  title: `닮은 인생 : ${name}`,
+  story
+}));
 
 const MARRIAGE_EVENT = {
   id: "marriage",
@@ -1356,7 +1628,7 @@ function serializePlayer(player) {
     diceBonus: player.diceBonus,
     spouseId: player.spouseId,
     spouseName: player.spouseName,
-    spouseTraits: player.spouseTraits || [],
+    spouseTraits: normalizeSpouseTraits(player.spouseTraits),
     spouseEffects: player.spouseEffects || null,
     jobId: player.jobId,
     jobName: player.jobName,
@@ -1368,6 +1640,11 @@ function serializePlayer(player) {
     finishRank: player.finishRank,
     bankrupt: player.bankrupt,
     hadBankruptcy: player.hadBankruptcy,
+    crisisCounters: normalizeCrisisCounters(player.crisisCounters),
+    gameOver: Boolean(player.gameOver),
+    gameOverReasons: Array.isArray(player.gameOverReasons) ? player.gameOverReasons : [],
+    endingAffinity: normalizeEndingAffinity(player.endingAffinity),
+    endingMoments: normalizeEndingMoments(player.endingMoments),
     tradeOfferUsed: player.tradeOfferUsed,
     taxesPaid: player.taxesPaid || [],
     storyLog: player.storyLog || [],
@@ -1400,7 +1677,7 @@ function hydratePlayer(data, index) {
     diceBonus: Number.isFinite(data.diceBonus) ? data.diceBonus : 0,
     spouseId: data.spouseId || null,
     spouseName: data.spouseName || null,
-    spouseTraits: Array.isArray(data.spouseTraits) ? data.spouseTraits : [],
+    spouseTraits: normalizeSpouseTraits(data.spouseTraits),
     spouseEffects: data.spouseEffects || null,
     jobId: data.jobId || null,
     jobName: data.jobName || null,
@@ -1408,10 +1685,15 @@ function hydratePlayer(data, index) {
     jobEffects: data.jobEffects || null,
     marriageResolved: Boolean(data.marriageResolved),
     marriageTurns: Number.isFinite(data.marriageTurns) ? data.marriageTurns : 0,
-    finished: Boolean(data.finished),
+    finished: Boolean(data.finished || data.gameOver),
     finishRank: Number.isFinite(data.finishRank) ? data.finishRank : null,
     bankrupt: Boolean(data.bankrupt),
     hadBankruptcy: Boolean(data.hadBankruptcy),
+    crisisCounters: normalizeCrisisCounters(data.crisisCounters),
+    gameOver: Boolean(data.gameOver),
+    gameOverReasons: Array.isArray(data.gameOverReasons) ? data.gameOverReasons : [],
+    endingAffinity: normalizeEndingAffinity(data.endingAffinity),
+    endingMoments: normalizeEndingMoments(data.endingMoments),
     tradeOfferUsed: Boolean(data.tradeOfferUsed),
     taxesPaid: Array.isArray(data.taxesPaid) ? data.taxesPaid : [],
     storyLog: Array.isArray(data.storyLog) ? data.storyLog : [],
@@ -1421,17 +1703,21 @@ function hydratePlayer(data, index) {
     skipTurns: Number.isFinite(data.skipTurns) ? data.skipTurns : 0
   };
 
-  if (player.spouseId && !player.spouseName) {
+  if (player.spouseId) {
     const spouse = getSpouseById(player.spouseId);
     if (spouse) {
       player.spouseName = spouse.name;
+      player.spouseTraits = {
+        advantages: Array.isArray(spouse.advantages) ? spouse.advantages : [],
+        disadvantages: Array.isArray(spouse.disadvantages) ? spouse.disadvantages : []
+      };
     }
-  }
-  if (player.spouseTraits.length && !player.spouseEffects) {
     player.spouseEffects = buildSpouseEffects(player.spouseTraits);
-  }
-  if (!player.marriageResolved && player.spouseId) {
-    player.marriageResolved = true;
+    if (!player.marriageResolved) {
+      player.marriageResolved = true;
+    }
+  } else {
+    player.spouseEffects = null;
   }
   if (player.jobId) {
     const job = setJobForPlayer(player, player.jobId);
@@ -1839,7 +2125,7 @@ function createPlayer(setup, index, slotIndex, playerType) {
     diceBonus: 0,
     spouseId: null,
     spouseName: null,
-    spouseTraits: [],
+    spouseTraits: { advantages: [], disadvantages: [] },
     spouseEffects: null,
     jobId: null,
     jobName: null,
@@ -1851,6 +2137,11 @@ function createPlayer(setup, index, slotIndex, playerType) {
     finishRank: null,
     bankrupt: false,
     hadBankruptcy: false,
+    crisisCounters: initCrisisCounters(),
+    gameOver: false,
+    gameOverReasons: [],
+    endingAffinity: {},
+    endingMoments: {},
     tradeOfferUsed: false,
     taxesPaid: [],
     storyLog: [],
@@ -3074,12 +3365,12 @@ function renderMarriageModal() {
     const desc = document.createElement("div");
     desc.className = "marriage-desc";
     desc.textContent = spouse.description;
-    const traits = spouse.traits
-      .map((traitId) => SPOUSE_TRAITS[traitId]?.label)
+    const traits = (spouse.advantages || [])
+      .map((traitId) => SPOUSE_PROS[traitId]?.label)
       .filter(Boolean)
       .join(", ");
-    const penalties = spouse.traits
-      .map((traitId) => SPOUSE_TRAITS[traitId]?.penaltyLabel)
+    const penalties = (spouse.disadvantages || [])
+      .map((traitId) => SPOUSE_CONS[traitId]?.label)
       .filter(Boolean)
       .join(", ");
     const traitLine = document.createElement("div");
@@ -3134,11 +3425,11 @@ function handleMarriageSkip() {
 
 function finalizeMarriageSelection(player, spouse) {
   closeMarriageModal();
-  const traitLabels = spouse?.traits
-    ? spouse.traits.map((traitId) => SPOUSE_TRAITS[traitId]?.label).filter(Boolean)
+  const traitLabels = spouse?.advantages
+    ? spouse.advantages.map((traitId) => SPOUSE_PROS[traitId]?.label).filter(Boolean)
     : [];
-  const penaltyLabels = spouse?.traits
-    ? spouse.traits.map((traitId) => SPOUSE_TRAITS[traitId]?.penaltyLabel).filter(Boolean)
+  const penaltyLabels = spouse?.disadvantages
+    ? spouse.disadvantages.map((traitId) => SPOUSE_CONS[traitId]?.label).filter(Boolean)
     : [];
   const story = spouse
     ? `${spouse.name}과(와) 함께 걷는 삶을 선택했다. 장점: ${traitLabels.join(", ")} / 단점: ${penaltyLabels.join(", ")}`
@@ -3778,8 +4069,8 @@ function getEventStory(eventId, choiceIndex, outcome) {
 function getMarriageStory(spouseId) {
   const spouse = getSpouseById(spouseId);
   if (!spouse) return DEFAULT_EVENT_STORY;
-  const traits = spouse.traits
-    .map((traitId) => SPOUSE_TRAITS[traitId]?.label)
+  const traits = (spouse.advantages || [])
+    .map((traitId) => SPOUSE_PROS[traitId]?.label)
     .filter(Boolean)
     .join(", ");
   return `${spouse.name}과(와) 함께 새로운 약속을 시작했다. 장점: ${traits || "없음"}`;
@@ -3826,6 +4117,9 @@ function handleChoiceSelect(choiceIndex) {
     state.currentEvent
   );
   const bonus = applyCharacterBonus(player, state.currentEvent, outcome);
+  if (!isMarriageEvent) {
+    addEndingAffinity(player, state.currentEvent, choice);
+  }
   const story = isMarriageEvent ? getMarriageStory(choice.spouseId) : getEventStory(state.currentEvent.id, choiceIndex, outcome);
   const baseEffects = mergeEffectObjects(outcome.applied, outcome.extraEffects);
   const sections = [{ title: player.name, effects: baseEffects }];
@@ -4485,6 +4779,188 @@ function applyTradeCharacterBonus(player) {
   return hasAnyEffect(bonus) ? applyEffects(player, bonus) : {};
 }
 
+function addEndingAffinity(player, event, choice) {
+  if (!player || !event || !choice) return;
+  const personaId = choice.persona || event.persona;
+  if (!personaId) return;
+  const baseWeight = Number.isFinite(event.personaWeight) ? event.personaWeight : 1;
+  const weight = Number.isFinite(choice.personaWeight) ? choice.personaWeight : baseWeight;
+  if (!player.endingAffinity) {
+    player.endingAffinity = {};
+  }
+  player.endingAffinity[personaId] = (player.endingAffinity[personaId] || 0) + weight;
+  if (!player.endingMoments) {
+    player.endingMoments = {};
+  }
+  const moments = Array.isArray(player.endingMoments[personaId])
+    ? player.endingMoments[personaId].slice()
+    : [];
+  const line = `${event.title} - ${choice.text}`;
+  if (!moments.includes(line)) {
+    moments.unshift(line);
+  }
+  player.endingMoments[personaId] = moments.slice(0, 6);
+}
+
+function getPrimaryPersona(player) {
+  const entries = Object.entries(player?.endingAffinity || {}).filter(([, score]) => score > 0);
+  if (!entries.length) return null;
+  entries.sort((a, b) => b[1] - a[1]);
+  const topScore = entries[0][1];
+  const topIds = entries.filter(([, score]) => score === topScore).map(([id]) => id);
+  if (topIds.length === 1) return topIds[0];
+  const seed = hashToUnit(`${player.id}:${topScore}:${player.finishRank || 0}`);
+  const index = Math.floor(seed * topIds.length);
+  return topIds[index] || topIds[0];
+}
+
+function getCrisisStatusKeys(player) {
+  if (!player) return [];
+  return STAT_KEYS.filter((key) => player[key] < CRISIS_THRESHOLD);
+}
+
+function formatCrisisReasons(keys) {
+  if (!Array.isArray(keys)) return "";
+  const labels = keys
+    .map((key) => CRISIS_STATUS[key]?.label || RESOURCE_LABELS[key])
+    .filter(Boolean);
+  return labels.join(", ");
+}
+
+function updateCrisisState(player) {
+  const events = { divorce: [], layoff: [] };
+  const gameOverKeys = [];
+  if (!player) return { events, gameOverKeys };
+  player.crisisCounters = normalizeCrisisCounters(player.crisisCounters);
+  STAT_KEYS.forEach((key) => {
+    const below = player[key] < CRISIS_THRESHOLD;
+    if (!below) {
+      player.crisisCounters[key] = 0;
+      return;
+    }
+    player.crisisCounters[key] = (player.crisisCounters[key] || 0) + 1;
+    const eventType = CRISIS_STATUS[key]?.event;
+    if (player.crisisCounters[key] === CRISIS_EVENT_TURNS) {
+      if (eventType === "divorce") {
+        events.divorce.push(key);
+      } else if (eventType === "layoff") {
+        events.layoff.push(key);
+      }
+    }
+    if (player.crisisCounters[key] >= CRISIS_GAMEOVER_TURNS) {
+      gameOverKeys.push(key);
+    }
+  });
+  return { events, gameOverKeys };
+}
+
+function clearSpouseForPlayer(player) {
+  if (!player) return;
+  player.spouseId = null;
+  player.spouseName = "이혼";
+  player.spouseTraits = { advantages: [], disadvantages: [] };
+  player.spouseEffects = null;
+  player.marriageResolved = true;
+  player.marriageTurns = 0;
+}
+
+function clearJobForPlayer(player) {
+  if (!player) return;
+  player.jobId = null;
+  player.jobName = "실직";
+  player.jobSalary = 0;
+  player.jobEffects = null;
+}
+
+function triggerDivorceCrisis(player, reasonKeys, onComplete) {
+  clearSpouseForPlayer(player);
+  const reasonText = formatCrisisReasons(reasonKeys);
+  addLog(`${player.name} - 이혼`, { player });
+  updateUI();
+  showSystemModal({
+    title: "이혼",
+    story: `${reasonText} 상태가 ${CRISIS_EVENT_TURNS}턴 지속되어 결혼이 종료됐다.`,
+    variant: "alert",
+    autoClose: isCpuPlayer(player)
+  });
+  pendingResultAction = () => {
+    if (onComplete) onComplete();
+  };
+}
+
+function triggerLayoffCrisis(player, reasonKeys, onComplete) {
+  clearJobForPlayer(player);
+  const reasonText = formatCrisisReasons(reasonKeys);
+  addLog(`${player.name} - 실직`, { player });
+  updateUI();
+  showSystemModal({
+    title: "실직",
+    story: `${reasonText} 상태가 ${CRISIS_EVENT_TURNS}턴 지속되어 직업 효과가 종료됐다.`,
+    variant: "alert",
+    autoClose: isCpuPlayer(player)
+  });
+  pendingResultAction = () => {
+    if (onComplete) onComplete();
+  };
+}
+
+function triggerGameOver(player, reasonKeys, onComplete) {
+  if (!player || player.gameOver) {
+    if (onComplete) onComplete();
+    return;
+  }
+  const reasonText = formatCrisisReasons(reasonKeys);
+  player.gameOver = true;
+  player.gameOverReasons = Array.isArray(reasonKeys) ? reasonKeys : [];
+  player.finished = true;
+  player.finishRank = null;
+  addLog(`${player.name} - 게임 오버`, { player });
+  updateUI();
+  showSystemModal({
+    title: "게임 오버",
+    story: `${reasonText} 상태가 ${CRISIS_GAMEOVER_TURNS}턴 이상 지속되어 더 이상 진행할 수 없다.`,
+    variant: "alert",
+    autoClose: isCpuPlayer(player)
+  });
+  pendingResultAction = () => {
+    if (onComplete) onComplete();
+  };
+}
+
+function handleCrisisAtEndTurn(player, advanceTurn) {
+  if (!player || player.finished) {
+    advanceTurn();
+    return;
+  }
+  const { events, gameOverKeys } = updateCrisisState(player);
+  if (gameOverKeys.length) {
+    triggerGameOver(player, gameOverKeys, advanceTurn);
+    return;
+  }
+  const tasks = [];
+  if (events.divorce.length && player.spouseEffects) {
+    tasks.push((next) => triggerDivorceCrisis(player, events.divorce, next));
+  }
+  if (events.layoff.length && player.jobId) {
+    tasks.push((next) => triggerLayoffCrisis(player, events.layoff, next));
+  }
+  if (!tasks.length) {
+    advanceTurn();
+    return;
+  }
+  let idx = 0;
+  const runNext = () => {
+    if (idx >= tasks.length) {
+      advanceTurn();
+      return;
+    }
+    const task = tasks[idx];
+    idx += 1;
+    task(runNext);
+  };
+  runNext();
+}
+
 function endTurn() {
   if (allPlayersFinished()) {
     endGame();
@@ -4506,6 +4982,9 @@ function endTurn() {
     return;
   }
   const balancerApplied = applyBalancerBonus(player);
+  const resolveEnd = () => {
+    handleCrisisAtEndTurn(player, advanceTurn);
+  };
   if (hasAnyEffect(balancerApplied)) {
     addLog(`${player.name} - 균형가 보너스 적용`, { effects: balancerApplied, player });
     updateUI();
@@ -4517,11 +4996,11 @@ function endTurn() {
       autoClose: isCpuPlayer(player)
     });
     pendingResultAction = () => {
-      advanceTurn();
+      resolveEnd();
     };
     return;
   }
-  advanceTurn();
+  resolveEnd();
 }
 
 function handleFinish(player) {
@@ -4564,11 +5043,7 @@ function endGame() {
 }
 
 function renderResults() {
-  const scores = state.players.map((player) => ({
-    player,
-    score: calculateScore(player)
-  }));
-  scores.sort((a, b) => b.score - a.score);
+  const scores = getScoreBoard();
   elements.finalRanking.innerHTML = "";
   scores.forEach((entry) => {
     const item = document.createElement("li");
@@ -4576,13 +5051,7 @@ function renderResults() {
     elements.finalRanking.appendChild(item);
   });
 
-  const titles = {
-    money: "부자왕",
-    health: "건강왕",
-    happiness: "행복왕",
-    growth: "성장왕",
-    reputation: "인기왕"
-  };
+  const titles = AWARD_TITLES;
   elements.finalTitles.innerHTML = "";
   Object.keys(titles).forEach((key) => {
     const topValue = Math.max(...state.players.map((player) => player[key]));
@@ -4614,6 +5083,42 @@ function calculateScore(player) {
   const sum = RESOURCE_KEYS.reduce((total, key) => total + player[key], 0) + assetValue;
   const minStat = Math.min(...RESOURCE_KEYS.map((key) => player[key]));
   return sum + minStat * 2;
+}
+
+const AWARD_TITLES = {
+  money: "부자왕",
+  health: "건강왕",
+  happiness: "행복왕",
+  growth: "성장왕",
+  reputation: "인기왕"
+};
+
+function getScoreBoard() {
+  const scores = state.players.map((player) => ({
+    player,
+    score: calculateScore(player)
+  }));
+  scores.sort((a, b) => b.score - a.score);
+  return scores;
+}
+
+function getScoreRank(player) {
+  const scores = getScoreBoard();
+  const index = scores.findIndex((entry) => entry.player.id === player.id);
+  const rank = index >= 0 ? index + 1 : scores.length;
+  const score = scores[index]?.score || calculateScore(player);
+  return { rank, score, total: scores.length };
+}
+
+function getAwardsForPlayer(player) {
+  const awards = [];
+  Object.keys(AWARD_TITLES).forEach((key) => {
+    const topValue = Math.max(...state.players.map((entry) => entry[key]));
+    if (player[key] === topValue) {
+      awards.push(AWARD_TITLES[key]);
+    }
+  });
+  return awards;
 }
 
 function meetsEndingRange(value, min, max) {
@@ -4675,6 +5180,8 @@ function buildEndingContext(player) {
   const lowKey = RESOURCE_KEYS.reduce((worst, key) => (player[key] < player[worst] ? key : worst), RESOURCE_KEYS[0]);
   const minAllStats = Math.min(...STAT_KEYS.map((key) => player[key]));
   const logInfo = summarizeStoryLog(player);
+  const personaId = getPrimaryPersona(player);
+  const personaMoments = personaId && player?.endingMoments?.[personaId] ? player.endingMoments[personaId] : [];
   return {
     assetValue,
     holdings,
@@ -4688,7 +5195,9 @@ function buildEndingContext(player) {
     logSignature: logInfo.signature,
     logTheme: logInfo.themeKey,
     logThemeLabel: logInfo.themeLabel,
-    logSummary: logInfo.summaryText
+    logSummary: logInfo.summaryText,
+    personaId,
+    personaMoments
   };
 }
 
@@ -4716,6 +5225,12 @@ function matchesEndingStory(player, entry, context) {
 }
 
 function pickEndingStory(player, context) {
+  if (context?.personaId) {
+    const personaMatch = ENDING_STORIES.find(
+      (entry) => entry.persona === context.personaId || entry.id === context.personaId
+    );
+    if (personaMatch) return personaMatch;
+  }
   const matches = ENDING_STORIES.filter((entry) => matchesEndingStory(player, entry, context));
   if (!matches.length) return DEFAULT_ENDING;
   const seed = hashToUnit(
@@ -4723,6 +5238,13 @@ function pickEndingStory(player, context) {
   );
   const index = Math.floor(seed * matches.length);
   return matches[index] || DEFAULT_ENDING;
+}
+
+function pickGameOverEnding(player, context) {
+  if (!GAME_OVER_ENDINGS.length) return DEFAULT_GAME_OVER_ENDING;
+  const seed = hashToUnit(`${player.id}:gameover:${context.logSignature || ""}`);
+  const index = Math.floor(seed * GAME_OVER_ENDINGS.length);
+  return GAME_OVER_ENDINGS[index] || DEFAULT_GAME_OVER_ENDING;
 }
 
 const STAT_NARRATIVE = {
@@ -4735,41 +5257,56 @@ const STAT_NARRATIVE = {
 
 function generateLifeReview(player) {
   const context = buildEndingContext(player);
-  const finishLine = player.finishRank ? `${player.finishRank}등으로 결승에 도착하며` : "끝까지 포기하지 않는 선택으로";
-  const assetText = assetSummary(player, context.assetValue);
-  const bankruptcyText = player.hadBankruptcy
-    ? "파산을 겪어도 다시 일어서는 장면이 있었고, 지원금으로 균형을 되찾았다."
-    : "재정 흐름을 안정적으로 관리하며 큰 흔들림 없이 버텨냈다.";
-  const statsLine =
-    `최종 상태는 돈 ${formatResourceValue("money", player.money)}, ` +
-    `행복 ${formatNumber(player.happiness)}, 건강 ${formatNumber(player.health)}, ` +
-    `성장 ${formatNumber(player.growth)}, 평판 ${formatNumber(player.reputation)}으로 기록됐다.`;
-  const logLine = `이야기 로그에는 ${context.logSummary}처럼 ${context.logThemeLabel}의 결이 선명하게 남았다.`;
-  const ending = pickEndingStory(player, context);
-  const endingStory = ending?.story || DEFAULT_ENDING.story;
-  const endingTitle = ending?.title || DEFAULT_ENDING.title;
+  const isGameOver = Boolean(player.gameOver);
+  const gameOverReasonText = formatCrisisReasons(player.gameOverReasons || []);
+  const finishLine = player.finishRank ? `${player.finishRank}등으로 결승에 도착했다.` : "끝까지 포기하지 않고 자신의 길을 걸었다.";
+  const progressLine = isGameOver
+    ? `${gameOverReasonText ? `${gameOverReasonText} 상태가 이어져` : "지표 악화가 이어져"} 여정이 멈췄다.`
+    : finishLine;
+  const ranking = getScoreRank(player);
+  const awards = getAwardsForPlayer(player);
+  const scoreLine = `총점 ${formatNumber(ranking.score)}점, 최종 ${ranking.rank}위.`;
+  const awardLine = `수상: ${awards.length ? awards.join(", ") : "없음"}.`;
+  const ending = isGameOver ? pickGameOverEnding(player, context) : pickEndingStory(player, context);
+  const endingStory = ending?.story || (isGameOver ? DEFAULT_GAME_OVER_ENDING.story : DEFAULT_ENDING.story);
+  const endingTitle = ending?.title || (isGameOver ? DEFAULT_GAME_OVER_ENDING.title : DEFAULT_ENDING.title);
+  const personaName = endingTitle.replace(/^닮은 인생\s*:\s*/, "");
+  const personaMoments = Array.isArray(context.personaMoments) ? context.personaMoments.slice(0, 3) : [];
+  const personaLine = isGameOver
+    ? `선택의 흔적은 ${context.logSummary} 같은 장면으로 남았지만, 끝은 ${personaName}의 그림자를 닮았다.`
+    : context.personaId
+    ? personaMoments.length
+      ? `선택의 흔적은 ${personaMoments.join(", ")}로 이어져 ${personaName}의 장면을 만들었다.`
+      : `이야기의 결은 ${personaName}에 가까웠다.`
+    : "선택의 흔적은 조용했지만 방향은 분명했다.";
+  const logLine = `이야기 로그에는 ${context.logSummary} 같은 장면이 남았다.`;
   const highlight = STAT_NARRATIVE[context.topKey]?.high || "자신만의 흐름을 만들었다";
-  const gap = STAT_NARRATIVE[context.lowKey]?.low || "조금 더 여유를 배워야 했다";
+  const gap = STAT_NARRATIVE[context.lowKey]?.low || "조금 더 여유가 필요했다";
+  const statLine = `${highlight}는 버팀목이었고, ${gap}은 다음 장을 고민하게 했다.`;
+  const bankruptcyText = player.hadBankruptcy
+    ? "파산을 겪었어도 다시 일어서는 장면이 있었고, 지원금으로 균형을 찾아갔다."
+    : "재정 흐름을 안정적으로 관리하며 큰 흔들림 없이 버텨냈다.";
+  const assetText = assetSummary(player, context.assetValue);
+
   let review =
     `${player.name}의 이야기는 한 해가 아니라 인생이었다. ` +
-    `${finishLine} 자신의 속도를 지켜낸 시간은 관계와 성장, 그리고 일상의 균형을 찾아가는 과정이었다. ` +
-    `${highlight}는 흐름이었고, ${gap}은 다음 걸음을 고민하게 했다. ` +
-    `${statsLine} ${logLine} ` +
+    `${progressLine} ${scoreLine} ${awardLine} ` +
+    `${personaLine} ${logLine} ${statLine} ` +
     `${bankruptcyText} ${assetText} ` +
     `${endingStory}`;
 
   const extras = [
-    "작은 선택이 모여 큰 흐름을 만들었다는 점이 특히 인상적이었다.",
-    "룰렛의 운과 전략적 판단이 조화를 이뤄 한 편의 이야기가 완성됐다.",
-    "가족과 도시를 향한 배려가 결과에 잔잔한 온기를 더했다."
+    "작은 선택들이 모여 큰 결말을 만들었다는 점이 특히 인상적이었다.",
+    "룰렛의 운과 전략적 판단이 맞물려 한 편의 소설처럼 흘러갔다.",
+    "웃음과 실수까지도 결국 이야기를 완성하는 재료가 되었다."
   ];
   let idx = 0;
-  while (review.length < 520 && idx < extras.length) {
+  while (review.length < 620 && idx < extras.length) {
     review = `${review} ${extras[idx]}`;
     idx += 1;
   }
-  if (review.length > 820) {
-    review = `${review.slice(0, 820)}…`;
+  if (review.length > 980) {
+    review = `${review.slice(0, 980)}...`;
   }
   return { title: endingTitle, text: review };
 }
@@ -4777,13 +5314,11 @@ function generateLifeReview(player) {
 function assetSummary(player, assetValue) {
   const holdings = getPlayerHoldings(player);
   if (!holdings.length) {
-    return "자산 거래는 신중하게 접근하며 안정적인 선택을 이어갔다.";
+    return "투자는 조심스럽게 접근하며 현금 중심의 리듬을 지켜냈다.";
   }
-  const summary = holdings
-    .map((entry) => `${entry.asset.name} ${entry.qty}개`)
-    .slice(0, 3)
-    .join(", ");
-  return `투자 포트폴리오에서는 ${summary} 등을 보유하며 현재 가치 약 $${formatNumber(assetValue)} 수준을 기록했다.`;
+  const names = holdings.slice(0, 3).map((entry) => entry.asset.name);
+  const suffix = holdings.length > names.length ? " 등" : "";
+  return `투자에서는 ${names.join(", ")}${suffix} 같은 선택을 거치며 손에 감각이 쌓였다.`;
 }
 
 function calculateAssetValue(player) {
@@ -5119,24 +5654,93 @@ function getSpouseById(spouseId) {
   return SPOUSES.find((spouse) => spouse.id === spouseId);
 }
 
+function normalizeSpouseTraits(traits) {
+  if (Array.isArray(traits)) {
+    return { advantages: traits, disadvantages: [] };
+  }
+  if (traits && typeof traits === "object") {
+    return {
+      advantages: Array.isArray(traits.advantages) ? traits.advantages : [],
+      disadvantages: Array.isArray(traits.disadvantages) ? traits.disadvantages : []
+    };
+  }
+  return { advantages: [], disadvantages: [] };
+}
+
+function initCrisisCounters() {
+  return STAT_KEYS.reduce((acc, key) => {
+    acc[key] = 0;
+    return acc;
+  }, {});
+}
+
+function normalizeCrisisCounters(counters) {
+  const normalized = initCrisisCounters();
+  if (!counters || typeof counters !== "object") {
+    return normalized;
+  }
+  STAT_KEYS.forEach((key) => {
+    normalized[key] = Number.isFinite(counters[key]) ? counters[key] : 0;
+  });
+  return normalized;
+}
+
+function normalizeEndingAffinity(data) {
+  if (!data || typeof data !== "object") return {};
+  const result = {};
+  Object.entries(data).forEach(([key, value]) => {
+    if (!key) return;
+    const score = Number.isFinite(value) ? value : 0;
+    if (score > 0) {
+      result[key] = score;
+    }
+  });
+  return result;
+}
+
+function normalizeEndingMoments(data) {
+  if (!data || typeof data !== "object") return {};
+  const result = {};
+  Object.entries(data).forEach(([key, value]) => {
+    if (!key) return;
+    if (Array.isArray(value)) {
+      result[key] = value.filter(Boolean).slice(0, 6);
+    }
+  });
+  return result;
+}
+
 function buildSpouseEffects(traits) {
+  const normalized = normalizeSpouseTraits(traits);
+  const advantages = normalized.advantages;
+  const disadvantages = normalized.disadvantages;
   let perTurn = {};
   let penalties = {};
   const timed = [];
   const traitLabels = [];
   const penaltyLabels = [];
-  (traits || []).forEach((traitId) => {
-    const trait = SPOUSE_TRAITS[traitId];
+  advantages.forEach((traitId) => {
+    const trait = SPOUSE_PROS[traitId];
     if (!trait) return;
     traitLabels.push(trait.label);
     if (trait.perTurn) {
       perTurn = mergeEffectObjects(perTurn, trait.perTurn);
     }
-    if (trait.penalty) {
-      penalties = mergeEffectObjects(penalties, trait.penalty);
+    if (trait.timed) {
+      timed.push({
+        label: trait.label,
+        remaining: trait.timed.turns,
+        every: trait.timed.every || 1,
+        effects: trait.timed.effects || {}
+      });
     }
-    if (trait.penaltyLabel) {
-      penaltyLabels.push(trait.penaltyLabel);
+  });
+  disadvantages.forEach((traitId) => {
+    const trait = SPOUSE_CONS[traitId];
+    if (!trait) return;
+    penaltyLabels.push(trait.label);
+    if (trait.perTurn) {
+      penalties = mergeEffectObjects(penalties, trait.perTurn);
     }
     if (trait.timed) {
       timed.push({
@@ -5161,7 +5765,7 @@ function setSpouseForPlayer(player, spouseId) {
   if (!spouseId) {
     player.spouseId = null;
     player.spouseName = null;
-    player.spouseTraits = [];
+    player.spouseTraits = { advantages: [], disadvantages: [] };
     player.spouseEffects = null;
     player.marriageResolved = true;
     return null;
@@ -5170,7 +5774,10 @@ function setSpouseForPlayer(player, spouseId) {
   if (!spouse) return null;
   player.spouseId = spouse.id;
   player.spouseName = spouse.name;
-  player.spouseTraits = spouse.traits || [];
+  player.spouseTraits = {
+    advantages: Array.isArray(spouse.advantages) ? spouse.advantages : [],
+    disadvantages: Array.isArray(spouse.disadvantages) ? spouse.disadvantages : []
+  };
   player.spouseEffects = buildSpouseEffects(player.spouseTraits);
   player.marriageResolved = true;
   player.marriageTurns = 0;
@@ -5397,7 +6004,11 @@ function renderMarriageInfoModal(player) {
     return;
   }
   if (!player.spouseId || !player.spouseEffects) {
-    appendInfoSection(elements.marriageInfoBody, "상태", "결혼을 선택하지 않았다.");
+    const status =
+      player.spouseName === "이혼"
+        ? "이혼 상태다. 결혼 효과가 종료됐다."
+        : "결혼을 선택하지 않았다.";
+    appendInfoSection(elements.marriageInfoBody, "상태", status);
     return;
   }
   const spouse = getSpouseById(player.spouseId);
@@ -6482,6 +7093,15 @@ function renderPlayers() {
     };
     if (player.bankrupt) {
       addTag("파산", "danger");
+    }
+    const crisisKeys = getCrisisStatusKeys(player);
+    crisisKeys.forEach((key) => {
+      const label = CRISIS_STATUS[key]?.label || RESOURCE_LABELS[key];
+      if (label) addTag(label, "warning");
+    });
+    if (player.gameOver) {
+      card.classList.add("gameover");
+      addTag("게임 오버", "danger");
     }
     if (tags.childElementCount) {
       card.appendChild(tags);

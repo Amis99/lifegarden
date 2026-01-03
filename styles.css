@@ -993,6 +993,12 @@ body::before {
   background: linear-gradient(135deg, rgba(217, 135, 123, 0.25), rgba(255, 255, 255, 0.95));
 }
 
+.player-card.gameover {
+  border-color: rgba(178, 70, 70, 0.55);
+  background: linear-gradient(135deg, rgba(178, 70, 70, 0.18), rgba(255, 255, 255, 0.92));
+  opacity: 0.88;
+}
+
 .players.compact .player-card {
   padding: 8px 10px;
   border-radius: 14px;
@@ -1561,6 +1567,12 @@ body::before {
   background: rgba(226, 83, 83, 0.15);
   border-color: rgba(226, 83, 83, 0.45);
   color: #b43c3c;
+}
+
+.player-tag.warning {
+  background: rgba(245, 178, 84, 0.18);
+  border-color: rgba(245, 178, 84, 0.55);
+  color: #b66a18;
 }
 
 .player-tag.accent {
