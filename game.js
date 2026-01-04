@@ -82,9 +82,11 @@ const MONEY_CAP_MAX = 12000;
 const MONEY_CAP_MIN = -15000;
 const STAT_LEVELS = [
   { level: 1, max: 30000 },
-  { level: 2, max: 50000 },
-  { level: 3, max: 100000 },
-  { level: 4, max: Infinity }
+  { level: 2, max: 40000 },
+  { level: 3, max: 50000 },
+  { level: 4, max: 60000 },
+  { level: 5, max: 70000 },
+  { level: 6, max: Infinity }
 ];
 const ENDING_PROFIT_THRESHOLD = 5;
 const CRISIS_THRESHOLD = 10000;
@@ -1634,6 +1636,7 @@ function serializePlayer(player) {
     jobName: player.jobName,
     jobSalary: player.jobSalary,
     jobEffects: player.jobEffects || null,
+    jobHistory: player.jobHistory || [],
     marriageResolved: player.marriageResolved,
     marriageTurns: player.marriageTurns,
     finished: player.finished,
@@ -1683,6 +1686,7 @@ function hydratePlayer(data, index) {
     jobName: data.jobName || null,
     jobSalary: Number.isFinite(data.jobSalary) ? data.jobSalary : 0,
     jobEffects: data.jobEffects || null,
+    jobHistory: Array.isArray(data.jobHistory) ? data.jobHistory : [],
     marriageResolved: Boolean(data.marriageResolved),
     marriageTurns: Number.isFinite(data.marriageTurns) ? data.marriageTurns : 0,
     finished: Boolean(data.finished || data.gameOver),
@@ -2131,6 +2135,7 @@ function createPlayer(setup, index, slotIndex, playerType) {
     jobName: null,
     jobSalary: 0,
     jobEffects: null,
+    jobHistory: [],
     marriageResolved: false,
     marriageTurns: 0,
     finished: false,
@@ -3463,8 +3468,12 @@ function showCareerEvent() {
   setPhase("event");
   updateUI();
   const job = getPlayerJob(player);
+  if (!job) {
+    showJobEvent({ mode: "rehire" });
+    return;
+  }
   if (job && isCareerAtRisk(player, job)) {
-    applyCareerLayoff(player, job);
+    applyCareerLayoff(player, job, { rehire: true });
     return;
   }
   if (isCpuPlayer(player)) {
@@ -3531,7 +3540,7 @@ function handleCareerPromote() {
   }
   closeCareerModal();
   if (isCareerAtRisk(player, job)) {
-    applyCareerLayoff(player, job);
+    applyCareerLayoff(player, job, { rehire: true });
     return;
   }
   if (!isCareerEligible(player, job, "promotion")) {
@@ -3575,7 +3584,7 @@ function handleCareerStay() {
 function handleCpuCareerDecision(player, job) {
   if (!player) return;
   if (job && isCareerAtRisk(player, job)) {
-    applyCareerLayoff(player, job);
+    applyCareerLayoff(player, job, { rehire: true });
     return;
   }
   const canPromote = job ? isCareerEligible(player, job, "promotion") : false;
@@ -3599,9 +3608,10 @@ function queueCareerContinue(player) {
   };
 }
 
-function applyCareerLayoff(player, job) {
+function applyCareerLayoff(player, job, options = {}) {
   if (!player) return;
   closeCareerModal();
+  const shouldRehire = Boolean(options.rehire);
   player.jobId = null;
   player.jobName = "실직";
   player.jobSalary = 0;
@@ -3614,6 +3624,12 @@ function applyCareerLayoff(player, job) {
     variant: "alert",
     autoClose: isCpuPlayer(player)
   });
+  if (shouldRehire) {
+    pendingResultAction = () => {
+      showJobEvent({ mode: "rehire" });
+    };
+    return;
+  }
   queueCareerContinue(player);
 }
 
@@ -3660,15 +3676,44 @@ function applyCareerStay(player) {
   queueCareerContinue(player);
 }
 
-function showJobEvent() {
+function showJobEvent(options = {}) {
   const player = currentPlayer();
   state.currentEvent = null;
   setPhase("event");
   updateUI();
-  state.jobSelectionMode = "initial";
+  const mode = options.mode || "initial";
+  state.jobSelectionMode = mode;
+  if (mode === "rehire" && !hasRehireOptions(player)) {
+    showSystemModal({
+      title: "재취업 불가",
+      story: "이전에 선택한 직업을 제외하고는 선택 가능한 직업이 없다.",
+      variant: "alert",
+      autoClose: isCpuPlayer(player)
+    });
+    pendingResultAction = () => {
+      setPhase("action");
+      updateUI();
+      scheduleCpuAction();
+    };
+    return;
+  }
   if (isCpuPlayer(player)) {
-    const job = pickCpuJob(player);
-    const assigned = job ? setJobForPlayer(player, job.id) : null;
+    const job = pickCpuJob(player, mode);
+    if (!job) {
+      showSystemModal({
+        title: "재취업 불가",
+        story: "선택 가능한 직업이 없어 이번 턴은 건너뛴다.",
+        variant: "alert",
+        autoClose: true
+      });
+      pendingResultAction = () => {
+        setPhase("action");
+        updateUI();
+        scheduleCpuAction();
+      };
+      return;
+    }
+    const assigned = setJobForPlayer(player, job.id);
     finalizeJobSelection(player, assigned);
     return;
   }
@@ -3701,6 +3746,9 @@ function syncJobModalHeader() {
   if (mode === "transfer") {
     elements.jobTitle.textContent = "이직 선택";
     elements.jobSubtitle.textContent = "이직 시 월급이 기본 급여의 2배로 설정됩니다.";
+  } else if (mode === "rehire") {
+    elements.jobTitle.textContent = "재취업 선택";
+    elements.jobSubtitle.textContent = "이전에 선택한 직업은 재취업으로 선택할 수 없습니다.";
   } else {
     elements.jobTitle.textContent = "직업 선택";
     elements.jobSubtitle.textContent = "월급과 영향을 고려해 직업을 골라주세요.";
@@ -3810,7 +3858,20 @@ function getJobRequirement(job, mode = "initial") {
   return job?.requirement || null;
 }
 
+function getJobHistory(player) {
+  return Array.isArray(player?.jobHistory) ? player.jobHistory : [];
+}
+
+function isJobRehireBlocked(player, job) {
+  if (!player || !job) return false;
+  const history = getJobHistory(player);
+  return history.includes(job.id);
+}
+
 function isJobEligible(player, job, mode = "initial") {
+  if (mode === "rehire" && isJobRehireBlocked(player, job)) {
+    return false;
+  }
   const requirement = getJobRequirement(job, mode);
   if (!requirement) return true;
   const current = player?.[requirement.key] ?? 0;
@@ -3820,7 +3881,10 @@ function isJobEligible(player, job, mode = "initial") {
   return current >= (requirement.min ?? 0);
 }
 
-function formatJobRequirement(job, mode = "initial") {
+function formatJobRequirement(job, mode = "initial", player = null) {
+  if (mode === "rehire" && player && isJobRehireBlocked(player, job)) {
+    return "재취업 불가: 이전 직업";
+  }
   const requirement = getJobRequirement(job, mode);
   if (!requirement) return "";
   const label = requirement.label || RESOURCE_LABELS[requirement.key] || requirement.key;
@@ -3828,6 +3892,10 @@ function formatJobRequirement(job, mode = "initial") {
     return `조건: ${label} Lv.${requirement.minLevel} 이상`;
   }
   return `조건: ${label} ${formatNumber(requirement.min)} 이상`;
+}
+
+function hasRehireOptions(player) {
+  return JOBS.some((job) => isJobEligible(player, job, "rehire"));
 }
 
 function renderJobModal() {
@@ -3855,7 +3923,7 @@ function renderJobModal() {
     const pay = document.createElement("div");
     pay.className = "job-pay";
     pay.textContent = formatJobEffectSummary(job, mode);
-    const requirement = formatJobRequirement(job, mode);
+    const requirement = formatJobRequirement(job, mode, player);
     let requirementLine = null;
     if (requirement) {
       requirementLine = document.createElement("div");
@@ -3869,7 +3937,11 @@ function renderJobModal() {
     if (!eligible) {
       selectBtn.disabled = true;
       selectBtn.classList.add("disabled");
-      selectBtn.textContent = "조건 부족";
+      if (mode === "rehire" && isJobRehireBlocked(player, job)) {
+        selectBtn.textContent = "재취업 불가";
+      } else {
+        selectBtn.textContent = "조건 부족";
+      }
     } else {
       selectBtn.textContent = mode === "transfer" ? "이직" : "선택";
     }
@@ -3898,9 +3970,12 @@ function handleJobSelect(event) {
   if (!job) return;
   const mode = getJobSelectionMode();
   if (!isJobEligible(player, job, mode)) {
+    const rehireBlocked = mode === "rehire" && isJobRehireBlocked(player, job);
     showSystemModal({
-      title: "조건 부족",
-      story: `${job.name}은(는) ${formatJobRequirement(job, mode)} 필요합니다.`,
+      title: rehireBlocked ? "재취업 불가" : "조건 부족",
+      story: rehireBlocked
+        ? "이미 선택했던 직업은 재취업으로 선택할 수 없다."
+        : `${job.name}은(는) ${formatJobRequirement(job, mode, player)} 필요합니다.`,
       variant: "alert",
       autoClose: isCpuPlayer(player)
     });
@@ -3962,10 +4037,11 @@ function scoreJobForPlayer(player, job, salaryOverride) {
   return scoreEffectsForPlayer(effects, player);
 }
 
-function pickCpuJob(player) {
+function pickCpuJob(player, mode = "initial") {
   if (!JOBS.length) return null;
-  const eligibleJobs = JOBS.filter((job) => isJobEligible(player, job));
-  const pool = eligibleJobs.length ? eligibleJobs : JOBS;
+  const eligibleJobs = JOBS.filter((job) => isJobEligible(player, job, mode));
+  const pool = mode === "rehire" ? eligibleJobs : eligibleJobs.length ? eligibleJobs : JOBS;
+  if (!pool.length) return null;
   const scored = pool.map((job) => ({ job, score: scoreJobForPlayer(player, job) }));
   scored.sort((a, b) => b.score - a.score);
   const pickFrom = scored.slice(0, Math.min(5, scored.length));
@@ -5789,6 +5865,12 @@ function setJobForPlayer(player, jobId, options = {}) {
   const job = JOBS.find((entry) => entry.id === jobId);
   if (!job) return null;
   const salary = Number.isFinite(options.salary) ? options.salary : job.salary;
+  if (!Array.isArray(player.jobHistory)) {
+    player.jobHistory = [];
+  }
+  if (!player.jobHistory.includes(job.id)) {
+    player.jobHistory.push(job.id);
+  }
   player.jobId = job.id;
   player.jobName = job.name;
   player.jobSalary = salary;
